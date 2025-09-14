@@ -201,35 +201,59 @@ export class CharacterSelectionScene extends Scene {
 
   private displayCharacterSlots() {
     const { width, height } = this.scale;
-    const slotWidth = 200;
-    const slotHeight = 300;
-    const spacing = 50;
     
-    // Calculate total width needed for 3 slots: (3 * slotWidth) + (2 * spacing)
-    const totalWidth = (3 * slotWidth) + (2 * spacing);
-    const startX = (width - totalWidth) / 2 + slotWidth / 2; // Add half slot width since slots are centered on their x position
+    // Get responsive scaling
+    const uiScale = ResponsiveLayout.getUIScale(width, height);
+    const isMobile = ResponsiveLayout.isMobile(width, height);
+    const mobileAdjustments = ResponsiveLayout.getMobileAdjustments(width, height);
+    
+    // Responsive slot dimensions
+    const baseSlotWidth = isMobile ? 200 : 240;
+    const baseSlotHeight = isMobile ? 320 : 360;
+    const slotWidth = Math.max(180, baseSlotWidth * uiScale);
+    const slotHeight = Math.max(280, baseSlotHeight * uiScale);
+    const spacing = Math.max(20, 60 * uiScale);
+    
+    // Check if we need to stack vertically on very small screens
+    const stackVertically = isMobile && mobileAdjustments.isPortrait && width < 600;
     
     // Adjust slot positioning based on whether guest warning is shown
     const isGuest = localStorage.getItem('hemoclast_is_guest');
     const isRegistered = localStorage.getItem('hemoclast_is_registered');
     const showGuestWarning = isGuest && !isRegistered;
     
-    const slotY = showGuestWarning ? height * 0.60 : height * 0.50;
-    
-    // Display 3 character slots
-    for (let i = 0; i < 3; i++) {
-      const x = startX + i * (slotWidth + spacing);
-      const character = this.characters[i] || null;
+    if (stackVertically) {
+      // Stack character slots vertically on very small screens
+      const startY = showGuestWarning ? height * 0.35 : height * 0.25;
+      const slotX = width / 2;
       
-      this.createCharacterSlot(x, slotY, slotWidth, slotHeight, character, i);
+      for (let i = 0; i < 3; i++) {
+        const y = startY + i * (slotHeight + spacing);
+        const character = this.characters[i] || null;
+        
+        this.createCharacterSlot(slotX, y, slotWidth, slotHeight, character, i);
+      }
+    } else {
+      // Horizontal layout for desktop and larger mobile screens
+      const totalWidth = (3 * slotWidth) + (2 * spacing);
+      const startX = (width - totalWidth) / 2 + slotWidth / 2;
+      const slotY = showGuestWarning ? height * 0.60 : height * 0.50;
+      
+      // Display 3 character slots horizontally
+      for (let i = 0; i < 3; i++) {
+        const x = startX + i * (slotWidth + spacing);
+        const character = this.characters[i] || null;
+        
+        this.createCharacterSlot(x, slotY, slotWidth, slotHeight, character, i);
+      }
     }
   }
 
   private createCharacterSlot(x: number, y: number, width: number, height: number, character: any, slotIndex: number) {
-    // Use responsive text scaling for character slot text
+    // Use responsive text scaling for character slot text - increased base sizes
     const { width: screenWidth, height: screenHeight } = this.scale;
-    const textFontSize = ResponsiveLayout.getScaledFontSize(16, screenWidth, screenHeight);
-    const buttonFontSize = ResponsiveLayout.getButtonFontSize(14, screenWidth, screenHeight);
+    const textFontSize = ResponsiveLayout.getScaledFontSize(20, screenWidth, screenHeight);
+    const buttonFontSize = ResponsiveLayout.getButtonFontSize(16, screenWidth, screenHeight);
     
     // Check if this character is selected
     const selectedCharacterId = localStorage.getItem('hemoclast_character_id');
@@ -289,50 +313,64 @@ export class CharacterSelectionScene extends Scene {
   }
 
   private displayExistingCharacter(x: number, y: number, character: any, fontSize: number, buttonFontSize: number) {
-    // Character portrait placeholder
-    const portrait = this.add.circle(x, y - 80, 50, this.getClassColor(character.character_class));
-    portrait.setStrokeStyle(3, 0x8B0000);
+    const { width: screenWidth, height: screenHeight } = this.scale;
+    const uiScale = ResponsiveLayout.getUIScale(screenWidth, screenHeight);
     
-    // Class icon - scale with text but allow larger
-    this.add.text(x, y - 80, this.getClassIcon(character.character_class), {
-      fontSize: `${Math.max(20, fontSize * 1.5)}px`
+    // Character portrait placeholder - responsive sizing
+    const portraitRadius = Math.max(45, 65 * uiScale);
+    const portraitY = y - Math.max(80, 100 * uiScale);
+    const portrait = this.add.circle(x, portraitY, portraitRadius, this.getClassColor(character.character_class));
+    portrait.setStrokeStyle(Math.max(2, 4 * uiScale), 0x8B0000);
+    
+    // Class icon - responsive sizing and positioning
+    this.add.text(x, portraitY, this.getClassIcon(character.character_class), {
+      fontSize: `${ResponsiveLayout.getScaledFontSize(32, screenWidth, screenHeight)}px`
     }).setOrigin(0.5);
     
-    // Character name - use responsive text scaling
-    this.add.text(x, y - 10, character.name, {
+    // Character name - responsive positioning
+    const nameY = y - Math.max(15, 20 * uiScale);
+    this.add.text(x, nameY, character.name, {
       fontSize: `${fontSize}px`,
       color: '#F5F5DC',
       fontFamily: 'Cinzel, serif'
     }).setOrigin(0.5);
     
-    // Character class and level - slightly smaller
-    this.add.text(x, y + 15, `${character.character_class} • Level ${character.level}`, {
-      fontSize: `${Math.max(10, fontSize * 0.8)}px`,
+    // Character class and level - responsive positioning
+    const classLevelY = nameY + Math.max(25, 30 * uiScale);
+    this.add.text(x, classLevelY, `${character.character_class} • Level ${character.level}`, {
+      fontSize: `${ResponsiveLayout.getScaledFontSize(14, screenWidth, screenHeight)}px`,
       color: '#C0C0C0',
       fontFamily: 'Cinzel, serif'
     }).setOrigin(0.5);
     
-    // Select button - use button font scaling
+    // Select button - responsive dimensions and positioning
+    const buttonDimensions = ResponsiveLayout.getTouchFriendlyButton(140, 40, screenWidth, screenHeight);
+    const buttonY = y + Math.max(70, 90 * uiScale);
     GraphicsUtils.createRuneScapeButton(
       this,
       x,
-      y + 80,
-      120,
-      35,
+      buttonY,
+      buttonDimensions.width,
+      buttonDimensions.height,
       'Select',
       buttonFontSize,
       () => this.selectCharacter(character)
     );
     
-    // Enhanced Delete button with better visual feedback
+    // Enhanced Delete button with responsive positioning
     const deleteButton = this.add.graphics();
-    const deleteText = this.add.text(x, y + 120, 'Delete', {
-      fontSize: `${Math.max(8, buttonFontSize * 0.8)}px`,
+    const deleteButtonY = buttonY + Math.max(50, 60 * uiScale);
+    const deleteText = this.add.text(x, deleteButtonY, 'Delete', {
+      fontSize: `${ResponsiveLayout.getScaledFontSize(12, screenWidth, screenHeight)}px`,
       color: '#FFD700',
       fontFamily: 'Cinzel, serif',
       stroke: '#000000',
-      strokeThickness: 1
+      strokeThickness: Math.max(1, uiScale)
     }).setOrigin(0.5);
+    
+    // Responsive delete button dimensions
+    const deleteButtonWidth = Math.max(80, 100 * uiScale);
+    const deleteButtonHeight = Math.max(25, 30 * uiScale);
     
     // Draw delete button with danger styling
     const drawDeleteButton = (bgColor: number, borderColor: number, glowing: boolean = false) => {
@@ -341,70 +379,105 @@ export class CharacterSelectionScene extends Scene {
       // Add glow effect if hovering
       if (glowing) {
         deleteButton.fillStyle(borderColor, 0.3);
-        deleteButton.fillRoundedRect(x - 54, y + 101, 108, 38, 6);
+        deleteButton.fillRoundedRect(
+          x - deleteButtonWidth / 2 - 4, 
+          deleteButtonY - deleteButtonHeight / 2 - 4, 
+          deleteButtonWidth + 8, 
+          deleteButtonHeight + 8, 
+          Math.max(4, 6 * uiScale)
+        );
       }
       
       // Main button background
       deleteButton.fillStyle(bgColor, 0.9);
-      deleteButton.fillRoundedRect(x - 50, y + 105, 100, 30, 4);
+      deleteButton.fillRoundedRect(
+        x - deleteButtonWidth / 2, 
+        deleteButtonY - deleteButtonHeight / 2, 
+        deleteButtonWidth, 
+        deleteButtonHeight, 
+        Math.max(3, 4 * uiScale)
+      );
       
       // Border
-      deleteButton.lineStyle(2, borderColor);
-      deleteButton.strokeRoundedRect(x - 50, y + 105, 100, 30, 4);
+      deleteButton.lineStyle(Math.max(1, 2 * uiScale), borderColor);
+      deleteButton.strokeRoundedRect(
+        x - deleteButtonWidth / 2, 
+        deleteButtonY - deleteButtonHeight / 2, 
+        deleteButtonWidth, 
+        deleteButtonHeight, 
+        Math.max(3, 4 * uiScale)
+      );
     };
     
     // Initial button state
     drawDeleteButton(0x4a0000, 0xDC143C);
     
     // Enhanced interactive area with proper cursor
-    const deleteHitArea = this.add.rectangle(x, y + 120, 110, 35, 0x000000, 0)
+    const deleteHitArea = this.add.rectangle(x, y + 140, 110, 35, 0x000000, 0) // Moved down from 120 to 140
       .setInteractive({ useHandCursor: true });
     
     // Enhanced hover effects
     deleteHitArea.on('pointerover', () => {
       drawDeleteButton(0x8B0000, 0xFF6666, true);
-      deleteText.setColor('#FFFFFF');
-      deleteText.setScale(1.05);
+      if (deleteText && deleteText.active) {
+        deleteText.setColor('#FFFFFF');
+        deleteText.setScale(1.05);
+      }
     });
     
     deleteHitArea.on('pointerout', () => {
       drawDeleteButton(0x4a0000, 0xDC143C);
-      deleteText.setColor('#FFD700');
-      deleteText.setScale(1.0);
+      if (deleteText && deleteText.active) {
+        deleteText.setColor('#FFD700');
+        deleteText.setScale(1.0);
+      }
     });
     
     deleteHitArea.on('pointerdown', () => {
       // Press animation
-      deleteText.setScale(0.95);
-      this.time.delayedCall(100, () => {
-        deleteText.setScale(1.0);
+      if (deleteText && deleteText.active) {
+        deleteText.setScale(0.95);
+        this.time.delayedCall(100, () => {
+          if (deleteText && deleteText.active) {
+            deleteText.setScale(1.0);
+          }
+          this.confirmDeleteCharacter(character);
+        });
+      } else {
         this.confirmDeleteCharacter(character);
-      });
+      }
     });
   }
 
   private displayEmptySlot(x: number, y: number, _slotIndex: number, fontSize: number, buttonFontSize: number) {
-    // Empty slot icon - scale with text but ensure minimum visibility
-    this.add.text(x, y - 50, '➕', {
-      fontSize: `${Math.max(24, fontSize * 1.8)}px`,
+    const { width: screenWidth, height: screenHeight } = this.scale;
+    const uiScale = ResponsiveLayout.getUIScale(screenWidth, screenHeight);
+    
+    // Empty slot icon - responsive sizing and positioning
+    const iconY = y - Math.max(50, 70 * uiScale);
+    this.add.text(x, iconY, '➕', {
+      fontSize: `${ResponsiveLayout.getScaledFontSize(48, screenWidth, screenHeight)}px`,
       color: '#666666'
     }).setOrigin(0.5);
     
-    // Create character text - use responsive text scaling
-    this.add.text(x, y, 'Create New\nCharacter', {
+    // Create character text - responsive positioning
+    const textY = y - Math.max(5, 10 * uiScale);
+    this.add.text(x, textY, 'Create New\nCharacter', {
       fontSize: `${fontSize}px`,
       color: '#C0C0C0',
       fontFamily: 'Cinzel, serif',
       align: 'center'
     }).setOrigin(0.5);
     
-    // Create button - use button font scaling
+    // Create button - responsive dimensions and positioning
+    const buttonDimensions = ResponsiveLayout.getTouchFriendlyButton(140, 40, screenWidth, screenHeight);
+    const buttonY = y + Math.max(70, 90 * uiScale);
     GraphicsUtils.createRuneScapeButton(
       this,
       x,
-      y + 80,
-      120,
-      35,
+      buttonY,
+      buttonDimensions.width,
+      buttonDimensions.height,
       'Create',
       buttonFontSize,
       () => this.createNewCharacter()
@@ -583,73 +656,103 @@ export class CharacterSelectionScene extends Scene {
   private confirmDeleteCharacter(character: any) {
     const { width, height } = this.scale;
     
+    // Get responsive scaling
+    const scale = ResponsiveLayout.getUIScale(width, height);
+    const isMobile = ResponsiveLayout.isMobile(width, height);
+    
     // Create modal overlay
     const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.85);
     overlay.setDepth(200);
     
-    // Enhanced dialog panel - taller to accommodate input
+    // Enhanced responsive dialog dimensions - ensure enough space for all content
+    const baseDialogWidth = isMobile ? 500 : 600;
+    const baseDialogHeight = isMobile ? 480 : 420; // Reduced height to eliminate empty space
+    // Ensure minimum dialog size even at small scales
+    const dialogWidth = Math.max(400, Math.min(baseDialogWidth * scale, width * 0.95));
+    const dialogHeight = Math.max(400, Math.min(baseDialogHeight * scale, height * 0.9));
+    
+    // Enhanced dialog panel - responsive sizing
     const panel = GraphicsUtils.createUIPanel(
       this,
-      width / 2 - 350,
-      height / 2 - 175,
-      700,
-      350,
+      width / 2 - dialogWidth / 2,
+      height / 2 - dialogHeight / 2,
+      dialogWidth,
+      dialogHeight,
       0x1a1a1a,
       0xDC143C,
       4
     );
     panel.setDepth(201);
     
+    // Responsive font sizes
+    const titleFontSize = ResponsiveLayout.getScaledFontSize(24, width, height);
+    const nameFontSize = ResponsiveLayout.getScaledFontSize(20, width, height);
+    const warningFontSize = ResponsiveLayout.getScaledFontSize(16, width, height);
+    const detailFontSize = ResponsiveLayout.getScaledFontSize(14, width, height);
+    
+    // Calculate responsive positions with better spacing
+    const centerY = height / 2;
+    const startY = centerY - dialogHeight / 2 + Math.max(40, 50 * scale);
+    const lineSpacing = Math.max(isMobile ? 35 : 30, 35 * scale);
+    
     // Warning title with enhanced styling
-    const title = this.add.text(width / 2, height / 2 - 130, '⚠️ PERMANENT DELETION', {
-      fontSize: '24px',
+    const title = this.add.text(width / 2, startY, '⚠️ PERMANENT DELETION', {
+      fontSize: `${titleFontSize}px`,
       color: '#DC143C',
       fontFamily: 'Nosifer, serif',
       stroke: '#000000',
-      strokeThickness: 2
+      strokeThickness: Math.max(1, 2 * scale)
     }).setOrigin(0.5).setDepth(202);
     
     // Character name being deleted
-    const characterName = this.add.text(width / 2, height / 2 - 90, `"${character.name}"`, {
-      fontSize: '20px',
+    const characterName = this.add.text(width / 2, startY + lineSpacing, `"${character.name}"`, {
+      fontSize: `${nameFontSize}px`,
       color: '#FFD700',
       fontFamily: 'Cinzel, serif',
       stroke: '#000000',
-      strokeThickness: 1
+      strokeThickness: Math.max(1, 1 * scale)
     }).setOrigin(0.5).setDepth(202);
     
-    // Warning message - split into multiple lines for better readability
-    const warning1 = this.add.text(width / 2, height / 2 - 60, 'This action CANNOT be undone!', {
-      fontSize: '16px',
+    // Warning message - better word wrapping for responsive design
+    const warning1 = this.add.text(width / 2, startY + lineSpacing * 2, 'THIS ACTION CANNOT BE UNDONE!', {
+      fontSize: `${warningFontSize}px`,
       color: '#F5F5DC',
-      fontFamily: 'Cinzel, serif'
+      fontFamily: 'Cinzel, serif',
+      align: 'center',
+      wordWrap: { width: dialogWidth - 40 }
     }).setOrigin(0.5).setDepth(202);
     
-    const warning2 = this.add.text(width / 2, height / 2 - 35, 'All progress, items, and achievements will be lost forever.', {
-      fontSize: '14px',
+    const warning2 = this.add.text(width / 2, startY + lineSpacing * 2.8, 'ALL PROGRESS, ITEMS, AND ACHIEVEMENTS WILL BE LOST FOREVER', {
+      fontSize: `${detailFontSize}px`,
       color: '#C0C0C0',
       fontFamily: 'Cinzel, serif',
-      fontStyle: 'italic'
+      align: 'center',
+      wordWrap: { width: dialogWidth - 40 }
     }).setOrigin(0.5).setDepth(202);
     
     // Instruction text
-    const instruction = this.add.text(width / 2, height / 2 - 5, 'Type "DELETE" below to confirm:', {
-      fontSize: '16px',
+    const instruction = this.add.text(width / 2, startY + lineSpacing * 4.2, 'TYPE "DELETE" BELOW TO CONFIRM:', {
+      fontSize: `${warningFontSize}px`,
       color: '#F5F5DC',
-      fontFamily: 'Cinzel, serif'
+      fontFamily: 'Cinzel, serif',
+      align: 'center'
     }).setOrigin(0.5).setDepth(202);
     
-    // Create HTML input for typing DELETE and buttons
-    const { confirmBtn, cancelBtn } = this.createDeleteConfirmationInput(character, [overlay, panel, title, characterName, warning1, warning2, instruction]);
+    // Create HTML input for typing DELETE and buttons (pass responsive dimensions)
+    const { confirmBtn, cancelBtn } = this.createDeleteConfirmationInput(
+      character, 
+      [overlay, panel, title, characterName, warning1, warning2, instruction],
+      { dialogWidth, dialogHeight, scale, startY, lineSpacing, isMobile }
+    );
     
-    // Add click outside to cancel functionality
+    // Add click outside to cancel functionality with responsive bounds
     overlay.setInteractive();
     overlay.on('pointerdown', (pointer: any) => {
       const panelBounds = {
-        left: width / 2 - 350,
-        right: width / 2 + 350,
-        top: height / 2 - 175,
-        bottom: height / 2 + 175
+        left: width / 2 - dialogWidth / 2,
+        right: width / 2 + dialogWidth / 2,
+        top: height / 2 - dialogHeight / 2,
+        bottom: height / 2 + dialogHeight / 2
       };
       
       // Only close if clicking outside the panel
@@ -660,7 +763,11 @@ export class CharacterSelectionScene extends Scene {
     });
   }
   
-  private createDeleteConfirmationInput(character: any, dialogElements: any[]): { confirmBtn: Phaser.GameObjects.Text, cancelBtn: Phaser.GameObjects.Text } {
+  private createDeleteConfirmationInput(
+    character: any, 
+    dialogElements: any[], 
+    dimensions?: { dialogWidth: number, dialogHeight: number, scale: number, startY: number, lineSpacing: number, isMobile?: boolean }
+  ): { confirmBtn: Phaser.GameObjects.Text, cancelBtn: Phaser.GameObjects.Text } {
     const { width, height } = this.scale;
     
     // Remove existing input if any
@@ -669,11 +776,16 @@ export class CharacterSelectionScene extends Scene {
       existingInput.remove();
     }
     
-    // Use the same responsive system as other scenes for consistency
-    const uiScale = ResponsiveLayout.getUIScale(width, height);
-    const inputWidth = Math.max(200, 280 * uiScale); // Reasonable minimum for usability
-    const fontSize = Math.max(12, 18 * uiScale); // Minimum for text legibility
-    const padding = Math.max(8, 15 * uiScale); // Adequate padding for usability
+    // Use responsive dimensions if provided, otherwise fallback to legacy scaling
+    const scale = dimensions?.scale || ResponsiveLayout.getUIScale(width, height);
+    const isMobile = dimensions?.isMobile || ResponsiveLayout.isMobile(width, height);
+    const inputDimensions = ResponsiveLayout.getMobileInputDimensions(280, 45, width, height);
+    
+    // Calculate input position relative to dialog with better spacing
+    const inputYPos = dimensions ? 
+      Math.min(dimensions.startY + dimensions.lineSpacing * 5.5, height / 2 + dimensions.dialogHeight / 2 - 120) :
+      height * 0.58;
+    const inputY = (inputYPos / height * 100);
     
     // Create confirmation input positioned below the instruction text
     const confirmInput = document.createElement('input');
@@ -684,40 +796,49 @@ export class CharacterSelectionScene extends Scene {
     confirmInput.style.cssText = `
       position: absolute;
       left: 50%;
-      top: 55%;
+      top: ${inputY}%;
       transform: translate(-50%, -50%);
-      width: ${inputWidth}px;
-      padding: ${padding}px;
+      width: ${inputDimensions.width}px;
+      height: ${inputDimensions.height}px;
+      padding: ${inputDimensions.padding}px;
       background: rgba(10, 10, 10, 0.95);
-      border: 3px solid #DC143C;
-      border-radius: 8px;
+      border: ${Math.max(2, 3 * scale)}px solid #DC143C;
+      border-radius: ${Math.max(6, 8 * scale)}px;
       color: #F5F5DC;
       font-family: 'Cinzel', serif;
-      font-size: ${fontSize}px;
-      font-weight: 600;
+      font-size: ${inputDimensions.fontSize}px;
       text-align: center;
       text-transform: uppercase;
       z-index: 1001;
       outline: none;
-      letter-spacing: 2px;
-      min-height: 40px;
+      letter-spacing: ${Math.max(1, 2 * scale)}px;
+      box-sizing: border-box;
     `;
     
-    // Create the bottom buttons first
-    const confirmBtn = this.add.text(width / 2 - 80, height / 2 + 130, 'Confirm', {
-      fontSize: '16px',
+    // Create responsive bottom buttons
+    const buttonDimensions = ResponsiveLayout.getTouchFriendlyButton(120, 45, width, height);
+    const buttonFontSize = ResponsiveLayout.getButtonFontSize(16, width, height);
+    const buttonSpacing = isMobile ? buttonDimensions.width / 2 + 30 * scale : Math.max(100, 120 * scale);
+    // Ensure buttons are positioned within dialog bounds
+    const buttonY = dimensions ? 
+      Math.min(dimensions.startY + dimensions.lineSpacing * 7.2, height / 2 + dimensions.dialogHeight / 2 - 60) : 
+      (height / 2 + 150); // fallback for legacy calls
+    const buttonPadding = { x: Math.max(15, 20 * scale), y: Math.max(8, 12 * scale) };
+    
+    const confirmBtn = this.add.text(width / 2 - buttonSpacing, buttonY, 'CONFIRM', {
+      fontSize: `${buttonFontSize}px`,
       color: '#FFFFFF',
       fontFamily: 'Cinzel, serif',
       backgroundColor: '#DC143C',
-      padding: { x: 25, y: 10 }
+      padding: buttonPadding
     }).setOrigin(0.5).setDepth(202).setInteractive({ useHandCursor: true });
     
-    const cancelBtn = this.add.text(width / 2 + 80, height / 2 + 130, 'Cancel', {
-      fontSize: '16px',
+    const cancelBtn = this.add.text(width / 2 + buttonSpacing, buttonY, 'CANCEL', {
+      fontSize: `${buttonFontSize}px`,
       color: '#F5F5DC',
       fontFamily: 'Cinzel, serif',
       backgroundColor: '#666666',
-      padding: { x: 25, y: 10 }
+      padding: buttonPadding
     }).setOrigin(0.5).setDepth(202).setInteractive({ useHandCursor: true });
     
     // Initially disable confirm button
@@ -910,62 +1031,88 @@ export class CharacterSelectionScene extends Scene {
     // Show upgrade dialog with improved messaging about data preservation
     const { width, height } = this.scale;
     
+    // Get responsive scaling
+    const scale = ResponsiveLayout.getUIScale(width, height);
+    const isMobile = ResponsiveLayout.isMobile(width, height);
+    
     // Create modal overlay
     const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.8);
     overlay.setDepth(100);
     
-    // Dialog panel - made taller for more content
+    // Enhanced responsive dialog dimensions for new content
+    const baseDialogWidth = isMobile ? 450 : 500;
+    const baseDialogHeight = isMobile ? 280 : 250; // Reduced height to eliminate empty space
+    // Ensure minimum dialog size even at small scales
+    const dialogWidth = Math.max(350, Math.min(baseDialogWidth * scale, width * 0.95));
+    const dialogHeight = Math.max(240, Math.min(baseDialogHeight * scale, height * 0.8));
+    
+    // Dialog panel - responsive sizing
     const panel = GraphicsUtils.createUIPanel(
       this,
-      width / 2 - 300,
-      height / 2 - 200,
-      600,
-      400,
+      width / 2 - dialogWidth / 2,
+      height / 2 - dialogHeight / 2,
+      dialogWidth,
+      dialogHeight,
       0x2d1b1b,
       0x8B0000,
       3
     );
     panel.setDepth(101);
     
-    // Dialog title
-    const title = this.add.text(width / 2, height / 2 - 150, 'Secure Your Progress', {
-      fontSize: '24px',
-      color: '#8B0000',
-      fontFamily: 'Nosifer, serif'
+    // Dialog title - "Secure your Progress" as single centered text
+    const titleFontSize = ResponsiveLayout.getScaledFontSize(22, width, height);
+    const titleY = height / 2 - dialogHeight / 2 + Math.max(40, 50 * scale);
+    
+    // Create centered title
+    const titleText = this.add.text(width / 2, titleY, 'Secure your Progress', {
+      fontSize: `${titleFontSize}px`,
+      color: '#FFD700',
+      fontFamily: 'Nosifer, serif',
+      align: 'center'
     }).setOrigin(0.5).setDepth(102);
     
-    // Enhanced description with data preservation info
-    const description = this.add.text(width / 2, height / 2 - 80, 
-      'Create a permanent account to:\n• Keep all your characters and progress\n• Access from any device\n• Secure your data in the cloud\n• Receive exclusive rewards\n\n✅ Your current characters will be preserved!', {
-      fontSize: '16px',
-      color: '#F5F5DC',
-      fontFamily: 'Cinzel, serif',
-      align: 'center',
-      lineSpacing: 8
-    }).setOrigin(0.5).setDepth(102);
+    // Create bullet points with new content
+    const bulletFontSize = ResponsiveLayout.getScaledFontSize(15, width, height);
+    const lineHeight = Math.max(24, bulletFontSize + 8);
+    const startY = height / 2 - dialogHeight / 2 + Math.max(90, 100 * scale);
     
-    // Character count info if they have characters
-    let characterInfo: Phaser.GameObjects.Text | null = null;
-    if (this.characters && this.characters.length > 0) {
-      const charCount = this.characters.filter(char => char !== null).length;
-      characterInfo = this.add.text(width / 2, height / 2 + 20, 
-        `${charCount} character${charCount !== 1 ? 's' : ''} will be transferred to your new account`, {
-        fontSize: '14px',
-        color: '#FFD700',
+    // New simplified bullet point items
+    const bulletPoints = [
+      { text: '- Data stored permanently' },
+      { text: '- Access from any device' }
+    ];
+    
+    const bulletElements: Phaser.GameObjects.Text[] = [];
+    
+    bulletPoints.forEach((item, index) => {
+      const yPos = startY + (index * lineHeight * 1.4);
+      
+      const bulletText = this.add.text(width / 2, yPos, item.text, {
+        fontSize: `${bulletFontSize}px`,
+        color: '#F5F5DC',
         fontFamily: 'Cinzel, serif',
-        fontStyle: 'italic'
+        align: 'center'
       }).setOrigin(0.5).setDepth(102);
-    }
+      
+      bulletElements.push(bulletText);
+    });
+  
     
-    // Create account button
+    // Responsive button dimensions
+    const buttonDimensions = ResponsiveLayout.getTouchFriendlyButton(140, 40, width, height);
+    const buttonFontSize = ResponsiveLayout.getButtonFontSize(13, width, height);
+    const buttonY = height / 2 + dialogHeight / 2 - Math.max(35, 40 * scale); // Reduced gap
+    const buttonSpacing = isMobile ? buttonDimensions.width / 2 + 25 * scale : Math.max(90, 100 * scale);
+    
+    // Create account button - responsive
     const createBtn = GraphicsUtils.createRuneScapeButton(
       this,
-      width / 2 - 80,
-      height / 2 + 80,
-      140,
-      40,
-      'Create Account',
-      14,
+      width / 2 - buttonSpacing,
+      buttonY,
+      buttonDimensions.width,
+      buttonDimensions.height,
+      'CREATE ACCOUNT',
+      buttonFontSize,
       () => {
         this.initiateAccountUpgrade();
       }
@@ -973,17 +1120,22 @@ export class CharacterSelectionScene extends Scene {
     createBtn.background.setDepth(102);
     createBtn.text.setDepth(103);
     
-    // Continue as guest button
+    // Continue to select button - responsive
     const continueBtn = GraphicsUtils.createRuneScapeButton(
       this,
-      width / 2 + 80,
-      height / 2 + 80,
-      140,
-      40,
-      'Continue as Guest',
-      14,
+      width / 2 + buttonSpacing,
+      buttonY,
+      buttonDimensions.width,
+      buttonDimensions.height,
+      'CONTINUE TO SELECT',
+      buttonFontSize,
       () => {
-        this.closeUpgradeDialog([overlay, panel, title, description, characterInfo, createBtn.background, createBtn.text, continueBtn.background, continueBtn.text]);
+        this.closeUpgradeDialog([
+          overlay, panel, titleText, 
+          createBtn.background, createBtn.text, continueBtn.background, continueBtn.text,
+          ...bulletElements
+        ]);
+        // Stay in character selection scene
       }
     );
     continueBtn.background.setDepth(102);
@@ -1038,96 +1190,118 @@ export class CharacterSelectionScene extends Scene {
   private showGuestLogoutDialog() {
     const { width, height } = this.scale;
     
+    // Get responsive scaling
+    const scale = ResponsiveLayout.getUIScale(width, height);
+    const isMobile = ResponsiveLayout.isMobile(width, height);
+    
     // Create modal overlay
     const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.8);
     overlay.setDepth(200);
     
-    // Dialog panel
+    // Enhanced responsive dialog dimensions
+    const baseDialogWidth = isMobile ? 400 : 500;
+    const baseDialogHeight = isMobile ? 280 : 250;
+    const dialogWidth = Math.max(350, Math.min(baseDialogWidth * scale, width * 0.95));
+    const dialogHeight = Math.max(240, Math.min(baseDialogHeight * scale, height * 0.8));
+    
+    // Dialog panel - responsive sizing
     const panel = GraphicsUtils.createUIPanel(
       this,
-      width / 2 - 300,
-      height / 2 - 150,
-      600,
-      300,
+      width / 2 - dialogWidth / 2,
+      height / 2 - dialogHeight / 2,
+      dialogWidth,
+      dialogHeight,
       0x2d1b1b,
       0x8B0000,
-      3
+      Math.max(2, 3 * scale)
     );
     panel.setDepth(201);
     
-    // Dialog title
-    const title = this.add.text(width / 2, height / 2 - 100, 'Guest Account Options', {
-      fontSize: '24px',
+    // Dialog title - responsive
+    const titleFontSize = ResponsiveLayout.getScaledFontSize(22, width, height);
+    const title = this.add.text(width / 2, height / 2 - dialogHeight / 2 + Math.max(40, 50 * scale), 'Guest Account Options', {
+      fontSize: `${titleFontSize}px`,
       color: '#8B0000',
-      fontFamily: 'Nosifer, serif'
+      fontFamily: 'Nosifer, serif',
+      align: 'center'
     }).setOrigin(0.5).setDepth(202);
     
-    // Dialog message
-    const message = this.add.text(width / 2, height / 2 - 40, 
+    // Dialog message - responsive
+    const messageFontSize = ResponsiveLayout.getScaledFontSize(15, width, height);
+    const message = this.add.text(width / 2, height / 2 - dialogHeight / 2 + Math.max(90, 100 * scale), 
       'Your guest progress is saved locally.\nWhat would you like to do?', {
-      fontSize: '16px',
+      fontSize: `${messageFontSize}px`,
       color: '#F5F5DC',
       fontFamily: 'Cinzel, serif',
       align: 'center',
-      lineSpacing: 8
+      lineSpacing: Math.max(6, 8 * scale),
+      wordWrap: { width: dialogWidth - 40 }
     }).setOrigin(0.5).setDepth(202);
     
-    // Continue as guest button
+    // Responsive button dimensions
+    const buttonDimensions = ResponsiveLayout.getTouchFriendlyButton(180, 40, width, height);
+    const buttonFontSize = ResponsiveLayout.getButtonFontSize(13, width, height);
+    const buttonY = height / 2 - dialogHeight / 2 + Math.max(150, 160 * scale);
+    const buttonSpacing = isMobile ? buttonDimensions.width / 2 + 20 * scale : Math.max(110, 120 * scale);
+    
+    // Continue to select button - stays in character selection
     const continueBtn = GraphicsUtils.createRuneScapeButton(
       this,
-      width / 2 - 120,
-      height / 2 + 20,
-      200,
-      40,
-      'Continue as Guest',
-      14,
+      width / 2 - buttonSpacing,
+      buttonY,
+      buttonDimensions.width,
+      buttonDimensions.height,
+      'Continue to Select',
+      buttonFontSize,
       () => {
-        // Just go back to login but keep the token
-        this.closeGuestDialog([overlay, panel, title, message]);
-        this.cleanupForm();
-        this.scene.start('LoginScene');
+        // Stay in character selection scene
+        this.closeGuestDialog([overlay, panel, title, message, logoutBtn]);
       }
     );
     continueBtn.background.setDepth(202);
     continueBtn.text.setDepth(203);
     
-    // Create account button
+    // Create account button - triggers account creation flow
     const createBtn = GraphicsUtils.createRuneScapeButton(
       this,
-      width / 2 + 120,
-      height / 2 + 20,
-      200,
-      40,
-      'Create Secure Account',
-      14,
+      width / 2 + buttonSpacing,
+      buttonY,
+      buttonDimensions.width,
+      buttonDimensions.height,
+      'Create Account',
+      buttonFontSize,
       () => {
-        // Keep guest data for potential account upgrade
-        this.closeGuestDialog([overlay, panel, title, message]);
-        this.cleanupForm();
-        this.scene.start('LoginScene');
+        // Trigger account upgrade flow
+        this.closeGuestDialog([overlay, panel, title, message, logoutBtn]);
+        this.initiateAccountUpgrade();
       }
     );
     createBtn.background.setDepth(202);
     createBtn.text.setDepth(203);
     
-    // Full logout button (warning)
-    const logoutBtn = this.add.text(width / 2, height / 2 + 80, 'Full Logout (Lose Progress)', {
-      fontSize: '14px',
+    // Full logout button (warning) - responsive positioning
+    const logoutBtnFontSize = ResponsiveLayout.getScaledFontSize(13, width, height);
+    const logoutBtn = this.add.text(width / 2, height / 2 + dialogHeight / 2 - Math.max(25, 30 * scale), 'Full Logout (Lose Progress)', {
+      fontSize: `${logoutBtnFontSize}px`,
       color: '#DC143C',
       fontFamily: 'Cinzel, serif',
-      fontStyle: 'italic'
+      align: 'center'
     }).setOrigin(0.5).setDepth(202).setInteractive();
     
     logoutBtn.on('pointerover', () => {
-      logoutBtn.setColor('#FF6666');
+      if (logoutBtn && logoutBtn.active) {
+        logoutBtn.setColor('#FF6666');
+      }
     });
     
     logoutBtn.on('pointerout', () => {
-      logoutBtn.setColor('#DC143C');
+      if (logoutBtn && logoutBtn.active) {
+        logoutBtn.setColor('#DC143C');
+      }
     });
     
     logoutBtn.on('pointerdown', () => {
-      this.closeGuestDialog([overlay, panel, title, message]);
+      this.closeGuestDialog([overlay, panel, title, message, logoutBtn, continueBtn.background, continueBtn.text, createBtn.background, createBtn.text]);
       this.performFullLogout();
     });
   }

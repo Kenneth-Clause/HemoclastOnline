@@ -34,6 +34,12 @@ export class LoginScene extends Scene {
     this.notificationManager.initialize(this);
     this.loadingManager.initialize(this);
     
+    // Check if this is a guest account upgrade and set to register mode
+    const isUpgrading = localStorage.getItem('hemoclast_upgrading_guest') === 'true';
+    if (isUpgrading) {
+      this.currentMode = 'register';
+    }
+    
     this.createUI();
   }
 
@@ -242,13 +248,12 @@ export class LoginScene extends Scene {
       });
     });
     
-    // Form title (positioned based on form type - login needs less space than registration)
-    const titleY = this.currentMode === 'login' ? formCenterY - 90 : formCenterY - 110;
+    // Form title (positioned based on form type - login needs less space than registration) - moved up slightly
+    const titleY = this.currentMode === 'login' ? formCenterY - 95 : formCenterY - 115; // Moved up 5px
     const formTitle = this.add.text(centerX, titleY, this.currentMode === 'login' ? 'Sign In' : 'Create Account',
       ResponsiveLayout.getTextStyle(24, width, height, {
         color: '#F5F5DC',
         fontFamily: 'Cinzel, serif',
-        fontWeight: '600'
       })
     ).setOrigin(0.5);
     this.sceneElements.push(formTitle);
@@ -273,33 +278,17 @@ export class LoginScene extends Scene {
       existingForm.remove();
     }
     
-    // Use the passed dimensions directly (not this.scale)
+    // Use mobile-optimized input dimensions
+    const inputDimensions = ResponsiveLayout.getMobileInputDimensions(300, 55, width, height);
+    const inputWidth = inputDimensions.width;
+    const inputHeight = inputDimensions.height;
+    const fontSize = inputDimensions.fontSize;
+    const padding = inputDimensions.padding;
+    
+    // Calculate gap with mobile adjustments
     const uiScale = ResponsiveLayout.getUIScale(width, height);
-    const baseInputWidth = 300;
-    const baseInputHeight = 55;
-    const baseFontSize = 16;
-    const basePadding = 12;
-    const baseGap = 12;
-    
-    // Calculate scaled dimensions using the same system as buttons - let responsive system work naturally
-    let inputWidth = baseInputWidth * uiScale;
-    let inputHeight = baseInputHeight * uiScale;
-    let fontSize = baseFontSize * uiScale;
-    let padding = basePadding * uiScale;
-    const gap = baseGap * uiScale;
-    
-    // Apply usability constraints - text must remain readable
-    const minTouchTarget = 32; // Adequate for touch interaction
-    const minFontSize = 12; // Minimum for text legibility
-    
-    // Smart input width: reasonable at all screen sizes
-    // Use a fixed reasonable width that works well at all scales
-    const reasonableInputWidth = Math.min(280, Math.max(180, width * 0.25)); // 25% of screen width, between 180px-280px
-    
-    // Ensure usability minimums are maintained
-    inputHeight = Math.max(inputHeight, minTouchTarget);
-    fontSize = Math.max(fontSize, minFontSize);
-    inputWidth = reasonableInputWidth; // Use the reasonable width instead of scaled width
+    const mobileAdjustments = ResponsiveLayout.getMobileAdjustments(width, height);
+    const gap = 12 * uiScale * (mobileAdjustments.spacingMultiplier || 1);
     
     
     // Create form container with responsive positioning
@@ -370,15 +359,13 @@ export class LoginScene extends Scene {
     const centerY = height / 2;
     const formCenterY = centerY + 10; // Match the form positioning
     
-    // Get UI scale for responsive button sizing
-    const uiScale = ResponsiveLayout.getUIScale(width, height);
+    // Get UI scale for responsive button sizing (used in touch button calculation)
     
-    // Main action button (Login/Register) - positioned based on form type with responsive sizing
-    const baseButtonWidth = 200;
-    const baseButtonHeight = 50;
-    const buttonWidth = Math.max(120, baseButtonWidth * uiScale);
-    const buttonHeight = Math.max(32, baseButtonHeight * uiScale);
-    const buttonY = this.currentMode === 'register' ? formCenterY + 130 : formCenterY + 90; // Login form is shorter, needs less space
+    // Main action button (Login/Register) - positioned based on form type with mobile-optimized sizing
+    const touchButton = ResponsiveLayout.getTouchFriendlyButton(200, 50, width, height);
+    const buttonWidth = touchButton.width;
+    const buttonHeight = touchButton.height;
+    const buttonY = this.currentMode === 'register' ? formCenterY + 132 : formCenterY + 92; // Moved down 2px
     
     const buttonBg = this.add.rectangle(centerX, buttonY, buttonWidth, buttonHeight, 0x2d1b1b)
       .setStrokeStyle(2, 0x8B0000)
@@ -390,7 +377,6 @@ export class LoginScene extends Scene {
       fontSize: `${ResponsiveLayout.getButtonFontSize(16, width, height)}px`,
       color: '#F5F5DC',
       fontFamily: 'Cinzel, serif',
-      fontWeight: '600',
       stroke: '#000000',
       strokeThickness: 1
     }).setOrigin(0.5);
@@ -398,15 +384,23 @@ export class LoginScene extends Scene {
     
     // Button hover effects
     buttonBg.on('pointerover', () => {
-      buttonBg.setFillStyle(0x4a0000);
-      buttonBg.setStrokeStyle(2, 0xDC143C);
-      buttonText.setColor('#FFD700');
+      if (buttonBg && buttonBg.active) {
+        buttonBg.setFillStyle(0x4a0000);
+        buttonBg.setStrokeStyle(2, 0xDC143C);
+      }
+      if (buttonText && buttonText.active) {
+        buttonText.setColor('#FFD700');
+      }
     });
     
     buttonBg.on('pointerout', () => {
-      buttonBg.setFillStyle(0x2d1b1b);
-      buttonBg.setStrokeStyle(2, 0x8B0000);
-      buttonText.setColor('#F5F5DC');
+      if (buttonBg && buttonBg.active) {
+        buttonBg.setFillStyle(0x2d1b1b);
+        buttonBg.setStrokeStyle(2, 0x8B0000);
+      }
+      if (buttonText && buttonText.active) {
+        buttonText.setColor('#F5F5DC');
+      }
     });
     
     buttonBg.on('pointerdown', () => {
@@ -540,11 +534,11 @@ export class LoginScene extends Scene {
     textColor: string = '#F5F5DC'
   ) {
     const { width: screenWidth, height: screenHeight } = this.scale;
-    const uiScale = ResponsiveLayout.getUIScale(screenWidth, screenHeight);
     
-    // Scale the button dimensions
-    const width = Math.max(100, baseWidth * uiScale);
-    const height = Math.max(32, baseHeight * uiScale);
+    // Use touch-friendly button dimensions for mobile optimization
+    const touchButton = ResponsiveLayout.getTouchFriendlyButton(baseWidth, baseHeight, screenWidth, screenHeight);
+    const width = touchButton.width;
+    const height = touchButton.height;
     
     const buttonBg = this.add.rectangle(x, y, width, height, bgColor)
       .setStrokeStyle(2, borderColor)
@@ -555,7 +549,6 @@ export class LoginScene extends Scene {
       fontSize: `${ResponsiveLayout.getButtonFontSize(16, screenWidth, screenHeight)}px`,
       color: textColor,
       fontFamily: 'Cinzel, serif',
-      fontWeight: '600',
       stroke: '#000000',
       strokeThickness: 1
     }).setOrigin(0.5);
@@ -563,22 +556,30 @@ export class LoginScene extends Scene {
     
     // Button hover effects
     buttonBg.on('pointerover', () => {
-      if (bgColor === 0x2d1b1b) {
-        // Sign up button hover
-        buttonBg.setFillStyle(0x4a0000);
-        buttonBg.setStrokeStyle(2, 0xDC143C);
+      if (buttonBg && buttonBg.active) {
+        if (bgColor === 0x2d1b1b) {
+          // Sign up button hover
+          buttonBg.setFillStyle(0x4a0000);
+          buttonBg.setStrokeStyle(2, 0xDC143C);
+        } else {
+          // Guest button hover
+          buttonBg.setFillStyle(0x666666);
+          buttonBg.setStrokeStyle(2, 0x888888);
+        }
+      }
+      if (buttonText && buttonText.active && bgColor === 0x2d1b1b) {
         buttonText.setColor('#FFD700');
-      } else {
-        // Guest button hover
-        buttonBg.setFillStyle(0x666666);
-        buttonBg.setStrokeStyle(2, 0x888888);
       }
     });
     
     buttonBg.on('pointerout', () => {
-      buttonBg.setFillStyle(bgColor);
-      buttonBg.setStrokeStyle(2, borderColor);
-      buttonText.setColor(textColor);
+      if (buttonBg && buttonBg.active) {
+        buttonBg.setFillStyle(bgColor);
+        buttonBg.setStrokeStyle(2, borderColor);
+      }
+      if (buttonText && buttonText.active) {
+        buttonText.setColor(textColor);
+      }
     });
     
     buttonBg.on('pointerdown', callback);
@@ -599,11 +600,11 @@ export class LoginScene extends Scene {
     textColor: string = '#F5F5DC'
   ) {
     const { width: screenWidth, height: screenHeight } = this.scale;
-    const uiScale = ResponsiveLayout.getUIScale(screenWidth, screenHeight);
     
-    // Scale the button dimensions
-    const width = Math.max(100, baseWidth * uiScale);
-    const height = Math.max(40, baseHeight * uiScale);
+    // Use touch-friendly button dimensions for mobile optimization
+    const touchButton = ResponsiveLayout.getTouchFriendlyButton(baseWidth, baseHeight, screenWidth, screenHeight);
+    const width = touchButton.width;
+    const height = touchButton.height;
     
     const buttonBg = this.add.rectangle(x, y, width, height, bgColor)
       .setStrokeStyle(2, borderColor)
@@ -615,7 +616,6 @@ export class LoginScene extends Scene {
       fontSize: `${ResponsiveLayout.getButtonFontSize(16, screenWidth, screenHeight)}px`,
       color: textColor,
       fontFamily: 'Cinzel, serif',
-      fontWeight: '600',
       stroke: '#000000',
       strokeThickness: 1
     }).setOrigin(0.5);
@@ -626,7 +626,6 @@ export class LoginScene extends Scene {
       fontSize: `${ResponsiveLayout.getButtonFontSize(14, screenWidth, screenHeight)}px`,
       color: textColor,
       fontFamily: 'Cinzel, serif',
-      fontWeight: '400',
       fontStyle: 'italic',
       stroke: '#000000',
       strokeThickness: 1
@@ -635,17 +634,29 @@ export class LoginScene extends Scene {
     
     // Button hover effects
     buttonBg.on('pointerover', () => {
-      buttonBg.setFillStyle(0x666666);
-      buttonBg.setStrokeStyle(2, 0x888888);
-      topButtonText.setColor('#FFFFFF');
-      bottomButtonText.setColor('#FFFFFF');
+      if (buttonBg && buttonBg.active) {
+        buttonBg.setFillStyle(0x666666);
+        buttonBg.setStrokeStyle(2, 0x888888);
+      }
+      if (topButtonText && topButtonText.active) {
+        topButtonText.setColor('#FFFFFF');
+      }
+      if (bottomButtonText && bottomButtonText.active) {
+        bottomButtonText.setColor('#FFFFFF');
+      }
     });
     
     buttonBg.on('pointerout', () => {
-      buttonBg.setFillStyle(bgColor);
-      buttonBg.setStrokeStyle(2, borderColor);
-      topButtonText.setColor(textColor);
-      bottomButtonText.setColor(textColor);
+      if (buttonBg && buttonBg.active) {
+        buttonBg.setFillStyle(bgColor);
+        buttonBg.setStrokeStyle(2, borderColor);
+      }
+      if (topButtonText && topButtonText.active) {
+        topButtonText.setColor(textColor);
+      }
+      if (bottomButtonText && bottomButtonText.active) {
+        bottomButtonText.setColor(textColor);
+      }
     });
     
     buttonBg.on('pointerdown', callback);
@@ -681,21 +692,38 @@ export class LoginScene extends Scene {
     // Clear any existing notifications to prevent stacking
     this.notificationManager.dismissAll();
     
+    // Check if this is a guest account upgrade
+    const isUpgrading = localStorage.getItem('hemoclast_upgrading_guest') === 'true';
+    
     const loadingId = this.loadingManager.show({
       type: 'spinner',
-      message: this.currentMode === 'login' ? 'Signing in...' : 'Creating account...',
+      message: isUpgrading ? 'Converting guest account...' : 
+               (this.currentMode === 'login' ? 'Signing in...' : 'Creating account...'),
       cancellable: false // Prevent cancellation during critical auth process
     });
     
     try {
-      const endpoint = this.currentMode === 'login' ? '/api/v1/auth/login' : '/api/v1/auth/register';
-      const body = this.currentMode === 'login' 
-        ? { username, password }
-        : { username, email, password };
+      let endpoint: string;
+      let body: any;
+      let headers: any = { 'Content-Type': 'application/json' };
+      
+      if (isUpgrading) {
+        // Guest account conversion - use existing guest token
+        const guestToken = localStorage.getItem('hemoclast_token');
+        endpoint = '/api/v1/auth/convert-guest';
+        body = { email, password };
+        headers['Authorization'] = `Bearer ${guestToken}`;
+      } else {
+        // Regular login/register flow
+        endpoint = this.currentMode === 'login' ? '/api/v1/auth/login' : '/api/v1/auth/register';
+        body = this.currentMode === 'login' 
+          ? { username, password }
+          : { username, email, password };
+      }
       
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(body)
       });
       
@@ -835,64 +863,35 @@ export class LoginScene extends Scene {
     // Check if this is a guest account upgrade
     const isUpgrading = localStorage.getItem('hemoclast_upgrading_guest') === 'true';
     
-    // Store auth token first
-    localStorage.setItem('hemoclast_token', authData.access_token);
+    // Store auth token first (JWT for registered users, session token for guests)
+    localStorage.setItem('hemoclast_token', authData.access_token || authData.session_token);
     localStorage.setItem('hemoclast_player_id', authData.player_id.toString());
     localStorage.setItem('hemoclast_username', authData.username);
     
-    // Mark as registered user (not guest)
-    localStorage.setItem('hemoclast_is_registered', 'true');
-    localStorage.removeItem('hemoclast_is_guest'); // Clear any guest flag
-    
-    // Handle guest account upgrade
     if (isUpgrading) {
-      this.handleGuestAccountUpgrade(authData);
-    } else {
-      // Regular login flow
-      this.completeAuthSuccess(authData, `Welcome back, ${authData.username}!`);
-    }
-  }
-  
-  private async handleGuestAccountUpgrade(authData: any) {
-    try {
-      // Get stored guest data
-      const guestCharactersData = localStorage.getItem('hemoclast_guest_characters');
-      const guestPlayerData = localStorage.getItem('hemoclast_guest_player_data');
-      
-      if (guestCharactersData || guestPlayerData) {
-        // Show upgrade in progress message
-        this.notificationManager.info(
-          'Transferring your characters to the new account...',
-          'Account Upgrade',
-          3000
-        );
-        
-        // Here you would typically make an API call to transfer the guest data
-        // For now, we'll simulate this process
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Clear the upgrade flags and temporary data
-        localStorage.removeItem('hemoclast_upgrading_guest');
-        localStorage.removeItem('hemoclast_guest_characters');
-        localStorage.removeItem('hemoclast_guest_player_data');
-        
-        // Show success message
-        this.completeAuthSuccess(authData, `Account created successfully! Your characters have been preserved.`);
-      } else {
-        // No guest data to transfer
-        localStorage.removeItem('hemoclast_upgrading_guest');
-        this.completeAuthSuccess(authData, `Account created successfully!`);
-      }
-    } catch (error) {
-      console.error('Error during guest account upgrade:', error);
-      // Still complete the auth but show warning
+      // Guest account was successfully converted - now it's a registered user
+      localStorage.setItem('hemoclast_is_registered', 'true');
+      localStorage.removeItem('hemoclast_is_guest');
       localStorage.removeItem('hemoclast_upgrading_guest');
       localStorage.removeItem('hemoclast_guest_characters');
       localStorage.removeItem('hemoclast_guest_player_data');
       
-      this.completeAuthSuccess(authData, `Account created! Note: There may have been an issue transferring guest data.`);
+      this.completeAuthSuccess(authData, `Account converted successfully! Your progress has been preserved.`);
+    } else if (authData.session_token) {
+      // New guest account
+      localStorage.setItem('hemoclast_is_guest', 'true');
+      localStorage.removeItem('hemoclast_is_registered');
+      
+      this.completeAuthSuccess(authData, `Welcome, ${authData.username}!`);
+    } else {
+      // Regular registered user login/register
+      localStorage.setItem('hemoclast_is_registered', 'true');
+      localStorage.removeItem('hemoclast_is_guest');
+      
+      this.completeAuthSuccess(authData, `Welcome back, ${authData.username}!`);
     }
   }
+  
   
   private completeAuthSuccess(authData: any, message: string) {
     // Update game store
@@ -931,46 +930,8 @@ export class LoginScene extends Scene {
   }
 
   private handleGuestSuccess(guestData: any) {
-    // Store auth token (same as regular users)
-    localStorage.setItem('hemoclast_token', guestData.access_token);
-    localStorage.setItem('hemoclast_player_id', guestData.player_id.toString());
-    localStorage.setItem('hemoclast_username', guestData.username);
-    
-    // Mark as guest user (not registered)
-    localStorage.setItem('hemoclast_is_guest', 'true');
-    localStorage.removeItem('hemoclast_is_registered'); // Clear any registered flag
-    
-    // Update game store
-    this.gameStore.store.getState().setPlayer({
-      id: guestData.player_id,
-      name: guestData.username,
-      level: 1,
-      experience: 0,
-      health: 100,
-      healthMax: 100,
-      mana: 50,
-      manaMax: 50,
-      gold: 0,
-      gems: 0
-    });
-    
-    // Cleanup form
-    this.cleanupForm();
-    
-    // Clear notifications and show success
-    this.notificationManager.dismissAll();
-    this.notificationManager.success(
-      `Welcome, ${guestData.username}!`,
-      'Guest Account Created',
-      2000
-    );
-    
-    // Immediate transition
-    this.cameras.main.fadeOut(500, 0, 0, 0);
-    this.cameras.main.once('camerafadeoutcomplete', () => {
-      this.gameStore.store.getState().setScene('CharacterSelectionScene');
-      this.scene.start('CharacterSelectionScene');
-    });
+    // Use the new unified auth success handler
+    this.handleAuthSuccess(guestData);
   }
 
 

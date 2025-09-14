@@ -11,6 +11,7 @@ from .quest import Quest, QuestNode
 from .raid_boss import RaidBoss, RaidDamage
 from .leaderboard import Leaderboard
 from .economy import EconomyLedger, CurrencyType
+from .guest_session import GuestSession
 
 __all__ = [
     "Player",
@@ -29,5 +30,6 @@ __all__ = [
     "RaidDamage",
     "Leaderboard",
     "EconomyLedger",
-    "CurrencyType"
+    "CurrencyType",
+    "GuestSession"
 ]

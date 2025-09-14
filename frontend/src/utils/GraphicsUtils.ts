@@ -164,21 +164,31 @@ export class GraphicsUtils {
       .setInteractive();
     
     hitArea.on('pointerover', () => {
-      background.clear();
-      background.fillGradientStyle(0x6a4a38, 0x6a4a38, 0x4d2f27, 0x4d2f27);
-      background.fillRoundedRect(x - width/2, y - height/2, width, height, 4);
-      background.lineStyle(2, 0xDC143C);
-      background.strokeRoundedRect(x - width/2, y - height/2, width, height, 4);
-      textObj.setColor('#FFD700');
+      // Add null checks to prevent errors
+      if (background && background.active) {
+        background.clear();
+        background.fillGradientStyle(0x6a4a38, 0x6a4a38, 0x4d2f27, 0x4d2f27);
+        background.fillRoundedRect(x - width/2, y - height/2, width, height, 4);
+        background.lineStyle(2, 0xDC143C);
+        background.strokeRoundedRect(x - width/2, y - height/2, width, height, 4);
+      }
+      if (textObj && textObj.active) {
+        textObj.setColor('#FFD700');
+      }
     });
     
     hitArea.on('pointerout', () => {
-      background.clear();
-      background.fillGradientStyle(0x4a3728, 0x4a3728, 0x2d1f17, 0x2d1f17);
-      background.fillRoundedRect(x - width/2, y - height/2, width, height, 4);
-      background.lineStyle(2, 0x8B0000);
-      background.strokeRoundedRect(x - width/2, y - height/2, width, height, 4);
-      textObj.setColor('#F5F5DC');
+      // Add null checks to prevent errors
+      if (background && background.active) {
+        background.clear();
+        background.fillGradientStyle(0x4a3728, 0x4a3728, 0x2d1f17, 0x2d1f17);
+        background.fillRoundedRect(x - width/2, y - height/2, width, height, 4);
+        background.lineStyle(2, 0x8B0000);
+        background.strokeRoundedRect(x - width/2, y - height/2, width, height, 4);
+      }
+      if (textObj && textObj.active) {
+        textObj.setColor('#F5F5DC');
+      }
     });
     
     hitArea.on('pointerdown', callback);

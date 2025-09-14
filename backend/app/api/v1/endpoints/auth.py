@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from app.core.database import get_db
 from app.core.config import settings
 from app.models.player import Player
+from app.models.guest_session import GuestSession
 
 router = APIRouter()
 security = HTTPBearer(auto_error=False)
@@ -34,6 +35,16 @@ class Token(BaseModel):
     token_type: str
     player_id: int
     username: str
+
+class GuestToken(BaseModel):
+    session_token: str
+    token_type: str
+    player_id: int
+    username: str
+
+class GuestToUserConversion(BaseModel):
+    email: EmailStr
+    password: str
 
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
@@ -61,6 +72,30 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     if not credentials:
         raise credentials_exception
     
+    # Check if it's a guest session token first
+    if credentials.credentials.startswith("guest_"):
+        result = await db.execute(
+            select(GuestSession).where(
+                GuestSession.session_token == credentials.credentials,
+                GuestSession.is_active == True
+            )
+        )
+        guest_session = result.scalar_one_or_none()
+        
+        if guest_session:
+            # Update last accessed time
+            guest_session.last_accessed = datetime.utcnow()
+            await db.commit()
+            
+            # Return the associated player
+            result = await db.execute(select(Player).where(Player.id == guest_session.player_id))
+            user = result.scalar_one_or_none()
+            if user:
+                return user
+        
+        raise credentials_exception
+    
+    # Handle JWT tokens for registered users
     try:
         payload = jwt.decode(credentials.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         username: str = payload.get("sub")
@@ -76,9 +111,9 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise credentials_exception
     return user
 
-@router.post("/guest", response_model=Token)
+@router.post("/guest", response_model=GuestToken)
 async def create_guest_account(db: AsyncSession = Depends(get_db)):
-    """Create a guest account with JWT token"""
+    """Create a guest account with persistent session token"""
     import uuid
     
     guest_name = f"Guest_{str(uuid.uuid4())[:8]}"
@@ -94,17 +129,69 @@ async def create_guest_account(db: AsyncSession = Depends(get_db)):
     await db.commit()
     await db.refresh(guest_player)
     
-    # Create access token for guest (same as regular users)
+    # Create persistent guest session
+    session_token = GuestSession.generate_session_token()
+    guest_session = GuestSession(
+        session_token=session_token,
+        guest_name=guest_name,
+        player_id=guest_player.id
+    )
+    
+    db.add(guest_session)
+    await db.commit()
+    
+    return {
+        "session_token": session_token,
+        "token_type": "guest",
+        "player_id": guest_player.id,
+        "username": guest_player.name
+    }
+
+@router.post("/convert-guest", response_model=Token)
+async def convert_guest_to_registered(
+    conversion_data: GuestToUserConversion,
+    current_user: Player = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Convert a guest account to a registered account"""
+    
+    # Find the active guest session for this player
+    result = await db.execute(
+        select(GuestSession).where(
+            GuestSession.player_id == current_user.id,
+            GuestSession.is_active == True
+        )
+    )
+    guest_session = result.scalar_one_or_none()
+    
+    if not guest_session:
+        raise HTTPException(status_code=400, detail="No active guest session found")
+    
+    # Check if email already exists
+    result = await db.execute(select(Player).where(Player.email == conversion_data.email))
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Update the player record to be a registered user
+    current_user.email = conversion_data.email
+    current_user.hashed_password = get_password_hash(conversion_data.password)
+    
+    # Mark the guest session as converted
+    guest_session.mark_as_converted()
+    
+    await db.commit()
+    
+    # Create a JWT token for the now-registered user
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": guest_player.name, "guest": True}, expires_delta=access_token_expires
+        data={"sub": current_user.name}, expires_delta=access_token_expires
     )
     
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "player_id": guest_player.id,
-        "username": guest_player.name
+        "player_id": current_user.id,
+        "username": current_user.name
     }
 
 @router.post("/register", response_model=Token)

@@ -6,6 +6,7 @@ import { Scene } from 'phaser';
 import { GameStore } from '../stores/gameStore';
 import { GraphicsUtils } from '../utils/GraphicsUtils';
 import { GothicTitleUtils } from '../utils/GothicTitleUtils';
+import { ResponsiveLayout } from '../utils/ResponsiveLayout';
 
 export class CharacterCreationScene extends Scene {
   private gameStore: GameStore;
@@ -19,47 +20,49 @@ export class CharacterCreationScene extends Scene {
 
   create() {
     const { width, height } = this.scale;
-    const baseFontSize = Math.min(width, height) / 60;
+    const uiScale = ResponsiveLayout.getUIScale(width, height);
     
     // Enhanced atmospheric background
     this.add.rectangle(width / 2, height / 2, width, height, 0x0a0a0a);
     
     // Add atmospheric particles
-    const particles = GothicTitleUtils.createAtmosphericParticles(this, width, height, {
+    GothicTitleUtils.createAtmosphericParticles(this, width, height, {
       colors: [0x8B0000, 0x4B0082, 0x228B22],
       quantity: 3,
       speed: { min: 10, max: 25 },
       alpha: { min: 0.1, max: 0.3 }
     });
     
-    // Enhanced Gothic Title
-    const gothicTitle = GothicTitleUtils.createDrippingTitle(
+    // Enhanced Gothic Title with responsive positioning
+    const titlePos = ResponsiveLayout.getAnchoredPosition('top-center', 0, 80 * uiScale, width, height);
+    GothicTitleUtils.createDrippingTitle(
       this,
-      width / 2,
-      height * 0.12,
+      titlePos.x,
+      titlePos.y,
       'CREATE YOUR',
       'CHAMPION',
       {
-        mainSize: baseFontSize * 1.2,
-        subSize: baseFontSize * 1.0,
+        mainSize: ResponsiveLayout.getScaledFontSize(28, width, height),
+        subSize: ResponsiveLayout.getScaledFontSize(24, width, height),
         mainColor: '#8B0000',
         subColor: '#FFD700',
-        spacing: 50,
+        spacing: 50 * uiScale,
         drippingEffect: true,
         glowEffect: true
       }
     );
     
-    // Add gothic separator
+    // Add gothic separator with responsive positioning
+    const separatorPos = ResponsiveLayout.getAnchoredPosition('top-center', 0, 160 * uiScale, width, height);
     GothicTitleUtils.createGothicSeparator(
       this,
-      width / 2,
-      height * 0.22,
-      width * 0.6,
+      separatorPos.x,
+      separatorPos.y,
+      Math.min(width * 0.8, 600 * uiScale),
       {
         color: 0x8B0000,
         ornamentColor: '#FFD700',
-        thickness: 3,
+        thickness: Math.max(2, 3 * uiScale),
         ornaments: true
       }
     );
@@ -79,14 +82,14 @@ export class CharacterCreationScene extends Scene {
 
   private createNameInput() {
     const { width, height } = this.scale;
-    const baseFontSize = Math.min(width, height) / 80;
+    const uiScale = ResponsiveLayout.getUIScale(width, height);
     
-    // Name label
-    this.add.text(width / 2, height * 0.25, 'Character Name:', {
-      fontSize: `${baseFontSize * 1.2}px`,
+    // Name label with responsive positioning
+    const labelPos = ResponsiveLayout.getAnchoredPosition('top-center', 0, 220 * uiScale, width, height);
+    this.add.text(labelPos.x, labelPos.y, 'Character Name:', {
+      fontSize: `${ResponsiveLayout.getScaledFontSize(20, width, height)}px`,
       color: '#F5F5DC',
       fontFamily: 'Cinzel, serif',
-      fontWeight: '600'
     }).setOrigin(0.5);
     
     // Create HTML input for character name
@@ -95,12 +98,21 @@ export class CharacterCreationScene extends Scene {
 
   private createHTMLNameInput() {
     const { width, height } = this.scale;
+    const uiScale = ResponsiveLayout.getUIScale(width, height);
     
     // Remove existing input
     const existingInput = document.getElementById('character-name-input');
     if (existingInput) {
       existingInput.remove();
     }
+    
+    // Get responsive input dimensions
+    const inputDimensions = ResponsiveLayout.getMobileInputDimensions(250, 40, width, height);
+    const inputPos = ResponsiveLayout.getAnchoredPosition('top-center', 0, 260 * uiScale, width, height);
+    
+    // Calculate position as percentage for CSS
+    const leftPercent = (inputPos.x / width) * 100;
+    const topPercent = (inputPos.y / height) * 100;
     
     // Create name input
     const nameInput = document.createElement('input');
@@ -110,19 +122,21 @@ export class CharacterCreationScene extends Scene {
     nameInput.maxLength = 20;
     nameInput.style.cssText = `
       position: absolute;
-      left: 50%;
-      top: 30%;
+      left: ${leftPercent}%;
+      top: ${topPercent}%;
       transform: translate(-50%, -50%);
-      width: 250px;
-      padding: 10px;
+      width: ${inputDimensions.width}px;
+      height: ${inputDimensions.height}px;
+      padding: ${inputDimensions.padding}px;
       background: rgba(20, 20, 20, 0.9);
-      border: 2px solid #8B0000;
-      border-radius: 6px;
+      border: ${Math.max(1, 2 * uiScale)}px solid #8B0000;
+      border-radius: ${Math.max(4, 6 * uiScale)}px;
       color: #F5F5DC;
       font-family: 'Cinzel', serif;
-      font-size: 16px;
+      font-size: ${inputDimensions.fontSize}px;
       text-align: center;
       z-index: 1000;
+      box-sizing: border-box;
     `;
     
     nameInput.addEventListener('input', (e) => {
@@ -135,14 +149,15 @@ export class CharacterCreationScene extends Scene {
 
   private createClassSelection() {
     const { width, height } = this.scale;
-    const baseFontSize = Math.min(width, height) / 80;
+    const uiScale = ResponsiveLayout.getUIScale(width, height);
+    const isMobile = ResponsiveLayout.isMobile(width, height);
     
-    // Class selection title
-    this.add.text(width / 2, height * 0.4, 'Choose Your Path:', {
-      fontSize: `${baseFontSize * 1.2}px`,
+    // Class selection title with responsive positioning
+    const titlePos = ResponsiveLayout.getAnchoredPosition('top-center', 0, 340 * uiScale, width, height);
+    this.add.text(titlePos.x, titlePos.y, 'Choose Your Path:', {
+      fontSize: `${ResponsiveLayout.getScaledFontSize(20, width, height)}px`,
       color: '#F5F5DC',
       fontFamily: 'Cinzel, serif',
-      fontWeight: '600'
     }).setOrigin(0.5);
     
     // Class options
@@ -173,55 +188,79 @@ export class CharacterCreationScene extends Scene {
       }
     ];
     
-    const slotWidth = 180;
-    const startX = width / 2 - slotWidth;
+    // Responsive class slot layout
+    const baseSlotWidth = 180;
+    const slotWidth = Math.max(140, baseSlotWidth * uiScale);
+    const slotSpacing = Math.max(10, 20 * uiScale);
     
-    classes.forEach((classData, index) => {
-      const x = startX + index * slotWidth;
-      const y = height * 0.55;
+    if (isMobile && ResponsiveLayout.getMobileAdjustments(width, height).isPortrait) {
+      // Stack vertically on mobile portrait
+      const startY = titlePos.y + 60 * uiScale;
+      const slotHeight = Math.max(180, 200 * uiScale);
       
-      this.createClassSlot(x, y, classData, baseFontSize);
-    });
+      classes.forEach((classData, index) => {
+        const x = width / 2;
+        const y = startY + index * (slotHeight + slotSpacing);
+        
+        this.createClassSlot(x, y, classData, slotWidth, slotHeight, width, height);
+      });
+    } else {
+      // Horizontal layout for desktop and mobile landscape
+      const totalWidth = classes.length * slotWidth + (classes.length - 1) * slotSpacing;
+      const startX = width / 2 - totalWidth / 2 + slotWidth / 2;
+      const y = titlePos.y + 120 * uiScale;
+      
+      classes.forEach((classData, index) => {
+        const x = startX + index * (slotWidth + slotSpacing);
+        
+        this.createClassSlot(x, y, classData, slotWidth, Math.max(180, 200 * uiScale), width, height);
+      });
+    }
   }
 
-  private createClassSlot(x: number, y: number, classData: any, fontSize: number) {
+  private createClassSlot(x: number, y: number, classData: any, slotWidth: number, slotHeight: number, screenWidth: number, screenHeight: number) {
     const isSelected = this.selectedClass === classData.name;
+    const uiScale = ResponsiveLayout.getUIScale(screenWidth, screenHeight);
+    
+    // Responsive slot dimensions
+    const actualWidth = Math.max(120, slotWidth - 20);
+    const actualHeight = Math.max(160, slotHeight);
+    const borderWidth = Math.max(2, 3 * uiScale);
     
     // Slot background
-    const slotBg = this.add.rectangle(x, y, 160, 200, isSelected ? classData.color : 0x2d1b1b, 0.8);
-    slotBg.setStrokeStyle(3, isSelected ? 0xFFD700 : 0x8B0000);
+    const slotBg = this.add.rectangle(x, y, actualWidth, actualHeight, isSelected ? classData.color : 0x2d1b1b, 0.8);
+    slotBg.setStrokeStyle(borderWidth, isSelected ? 0xFFD700 : 0x8B0000);
     
     // Class icon
-    this.add.text(x, y - 60, classData.icon, {
-      fontSize: `${fontSize * 2.5}px`
+    this.add.text(x, y - actualHeight * 0.3, classData.icon, {
+      fontSize: `${ResponsiveLayout.getScaledFontSize(40, screenWidth, screenHeight)}px`
     }).setOrigin(0.5);
     
     // Class name
-    this.add.text(x, y - 20, classData.title, {
-      fontSize: `${fontSize * 1.2}px`,
+    this.add.text(x, y - actualHeight * 0.1, classData.title, {
+      fontSize: `${ResponsiveLayout.getScaledFontSize(18, screenWidth, screenHeight)}px`,
       color: isSelected ? '#FFD700' : '#F5F5DC',
       fontFamily: 'Cinzel, serif',
-      fontWeight: '600'
     }).setOrigin(0.5);
     
     // Stats focus
-    this.add.text(x, y + 5, classData.stats, {
-      fontSize: `${fontSize * 0.8}px`,
+    this.add.text(x, y + actualHeight * 0.02, classData.stats, {
+      fontSize: `${ResponsiveLayout.getScaledFontSize(14, screenWidth, screenHeight)}px`,
       color: '#C0C0C0',
       fontFamily: 'Cinzel, serif'
     }).setOrigin(0.5);
     
     // Description
-    this.add.text(x, y + 40, classData.description, {
-      fontSize: `${fontSize * 0.7}px`,
+    this.add.text(x, y + actualHeight * 0.2, classData.description, {
+      fontSize: `${ResponsiveLayout.getScaledFontSize(12, screenWidth, screenHeight)}px`,
       color: '#C0C0C0',
       fontFamily: 'Cinzel, serif',
       align: 'center',
-      wordWrap: { width: 140 }
+      wordWrap: { width: actualWidth - 20 }
     }).setOrigin(0.5);
     
-    // Make interactive
-    const hitArea = this.add.rectangle(x, y, 160, 200, 0x000000, 0).setInteractive();
+    // Make interactive with touch-friendly hit area
+    const hitArea = this.add.rectangle(x, y, actualWidth, actualHeight, 0x000000, 0).setInteractive();
     
     hitArea.on('pointerdown', () => {
       this.selectClass(classData.name);
@@ -230,27 +269,57 @@ export class CharacterCreationScene extends Scene {
 
   private createCharacterPreview() {
     const { width, height } = this.scale;
-    const baseFontSize = Math.min(width, height) / 80;
+    const uiScale = ResponsiveLayout.getUIScale(width, height);
+    const isMobile = ResponsiveLayout.isMobile(width, height);
+    const mobileAdjustments = ResponsiveLayout.getMobileAdjustments(width, height);
     
-    // Preview panel
-    GraphicsUtils.createUIPanel(
-      this,
-      width - 250,
-      height * 0.3,
-      200,
-      300,
-      0x1a1a1a,
-      0x8B0000,
-      2
-    );
-    
-    // Preview title
-    this.add.text(width - 150, height * 0.35, 'Preview', {
-      fontSize: `${baseFontSize * 1.2}px`,
-      color: '#F5F5DC',
-      fontFamily: 'Cinzel, serif',
-      fontWeight: '600'
-    }).setOrigin(0.5);
+    if (isMobile && mobileAdjustments.isPortrait) {
+      // On mobile portrait, place preview at bottom
+      const previewPos = ResponsiveLayout.getAnchoredPosition('bottom-center', 0, 200 * uiScale, width, height);
+      const panelWidth = Math.min(280, width * 0.9);
+      const panelHeight = Math.max(150, 180 * uiScale);
+      
+      GraphicsUtils.createUIPanel(
+        this,
+        previewPos.x,
+        previewPos.y,
+        panelWidth,
+        panelHeight,
+        0x1a1a1a,
+        0x8B0000,
+        Math.max(1, 2 * uiScale)
+      );
+      
+      // Preview title
+      this.add.text(previewPos.x, previewPos.y - panelHeight * 0.35, 'Preview', {
+        fontSize: `${ResponsiveLayout.getScaledFontSize(18, width, height)}px`,
+        color: '#F5F5DC',
+        fontFamily: 'Cinzel, serif',
+      }).setOrigin(0.5);
+    } else {
+      // Desktop and mobile landscape - place on right side
+      const previewPos = ResponsiveLayout.getAnchoredPosition('top-right', 220 * uiScale, 300 * uiScale, width, height);
+      const panelWidth = Math.max(160, 200 * uiScale);
+      const panelHeight = Math.max(200, 300 * uiScale);
+      
+      GraphicsUtils.createUIPanel(
+        this,
+        previewPos.x,
+        previewPos.y,
+        panelWidth,
+        panelHeight,
+        0x1a1a1a,
+        0x8B0000,
+        Math.max(1, 2 * uiScale)
+      );
+      
+      // Preview title
+      this.add.text(previewPos.x, previewPos.y - panelHeight * 0.35, 'Preview', {
+        fontSize: `${ResponsiveLayout.getScaledFontSize(18, width, height)}px`,
+        color: '#F5F5DC',
+        fontFamily: 'Cinzel, serif',
+      }).setOrigin(0.5);
+    }
     
     // Character preview (will update based on selection)
     this.updateCharacterPreview();
@@ -258,7 +327,9 @@ export class CharacterCreationScene extends Scene {
 
   private updateCharacterPreview() {
     const { width, height } = this.scale;
-    const baseFontSize = Math.min(width, height) / 80;
+    const uiScale = ResponsiveLayout.getUIScale(width, height);
+    const isMobile = ResponsiveLayout.isMobile(width, height);
+    const mobileAdjustments = ResponsiveLayout.getMobileAdjustments(width, height);
     
     // Remove existing preview elements
     const existingPreview = this.children.getByName('character-preview');
@@ -266,35 +337,43 @@ export class CharacterCreationScene extends Scene {
       existingPreview.destroy();
     }
     
+    // Calculate preview container position
+    let containerPos;
+    if (isMobile && mobileAdjustments.isPortrait) {
+      containerPos = ResponsiveLayout.getAnchoredPosition('bottom-center', 0, 200 * uiScale, width, height);
+    } else {
+      containerPos = ResponsiveLayout.getAnchoredPosition('top-right', 220 * uiScale, 350 * uiScale, width, height);
+    }
+    
     // Preview character
-    const previewContainer = this.add.container(width - 150, height * 0.5);
+    const previewContainer = this.add.container(containerPos.x, containerPos.y);
     previewContainer.setName('character-preview');
     
     // Character model placeholder
-    const characterModel = this.add.circle(0, -20, 40, this.getClassColor(this.selectedClass));
-    characterModel.setStrokeStyle(2, 0x8B0000);
+    const modelRadius = Math.max(25, 40 * uiScale);
+    const characterModel = this.add.circle(0, -20 * uiScale, modelRadius, this.getClassColor(this.selectedClass));
+    characterModel.setStrokeStyle(Math.max(1, 2 * uiScale), 0x8B0000);
     previewContainer.add(characterModel);
     
     // Class icon
-    const classIcon = this.add.text(0, -20, this.getClassIcon(this.selectedClass), {
-      fontSize: `${baseFontSize * 2}px`
+    const classIcon = this.add.text(0, -20 * uiScale, this.getClassIcon(this.selectedClass), {
+      fontSize: `${ResponsiveLayout.getScaledFontSize(32, width, height)}px`
     }).setOrigin(0.5);
     previewContainer.add(classIcon);
     
     // Character name
     if (this.characterName) {
-      const nameText = this.add.text(0, 20, this.characterName, {
-        fontSize: `${baseFontSize}px`,
+      const nameText = this.add.text(0, 20 * uiScale, this.characterName, {
+        fontSize: `${ResponsiveLayout.getScaledFontSize(16, width, height)}px`,
         color: '#F5F5DC',
         fontFamily: 'Cinzel, serif',
-        fontWeight: '600'
       }).setOrigin(0.5);
       previewContainer.add(nameText);
     }
     
     // Selected class
-    const classText = this.add.text(0, 40, this.selectedClass.charAt(0).toUpperCase() + this.selectedClass.slice(1), {
-      fontSize: `${baseFontSize * 0.9}px`,
+    const classText = this.add.text(0, 40 * uiScale, this.selectedClass.charAt(0).toUpperCase() + this.selectedClass.slice(1), {
+      fontSize: `${ResponsiveLayout.getScaledFontSize(14, width, height)}px`,
       color: '#C0C0C0',
       fontFamily: 'Cinzel, serif'
     }).setOrigin(0.5);
@@ -303,51 +382,111 @@ export class CharacterCreationScene extends Scene {
 
   private createActionButtons() {
     const { width, height } = this.scale;
-    const baseFontSize = Math.min(width, height) / 80;
+    const uiScale = ResponsiveLayout.getUIScale(width, height);
+    const isMobile = ResponsiveLayout.isMobile(width, height);
+    const mobileAdjustments = ResponsiveLayout.getMobileAdjustments(width, height);
     
-    // Enhanced Create character button
-    GothicTitleUtils.createEnhancedGothicButton(
-      this,
-      width / 2 - 100,
-      height * 0.85,
-      180,
-      50,
-      'Create Champion',
-      () => this.createCharacter(),
-      {
-        fontSize: baseFontSize * 1.1,
-        bgColor: 0x4a0000,
-        borderColor: 0x8B0000,
-        textColor: '#FFD700',
-        hoverBgColor: 0x8B0000,
-        hoverBorderColor: 0xFFD700,
-        hoverTextColor: '#FFFFFF',
-        glowEffect: true,
-        shadowEffect: true
-      }
-    );
+    // Get touch-friendly button dimensions
+    const createButtonDims = ResponsiveLayout.getTouchFriendlyButton(180, 50, width, height);
+    const backButtonDims = ResponsiveLayout.getTouchFriendlyButton(120, 50, width, height);
     
-    // Enhanced Back button
-    GothicTitleUtils.createEnhancedGothicButton(
-      this,
-      width / 2 + 100,
-      height * 0.85,
-      120,
-      50,
-      'Back',
-      () => this.goBack(),
-      {
-        fontSize: baseFontSize,
-        bgColor: 0x2d1b1b,
-        borderColor: 0x666666,
-        textColor: '#F5F5DC',
-        hoverBgColor: 0x4a0000,
-        hoverBorderColor: 0x8B0000,
-        hoverTextColor: '#FFD700',
-        glowEffect: false,
-        shadowEffect: true
-      }
-    );
+    if (isMobile && mobileAdjustments.isPortrait) {
+      // Stack buttons vertically on mobile portrait
+      const buttonSpacing = 20 * uiScale;
+      const buttonsY = ResponsiveLayout.getAnchoredPosition('bottom-center', 0, 120 * uiScale, width, height).y;
+      
+      // Enhanced Create character button
+      GothicTitleUtils.createEnhancedGothicButton(
+        this,
+        width / 2,
+        buttonsY - buttonSpacing,
+        createButtonDims.width,
+        createButtonDims.height,
+        'Create Champion',
+        () => this.createCharacter(),
+        {
+          fontSize: ResponsiveLayout.getButtonFontSize(18, width, height),
+          bgColor: 0x4a0000,
+          borderColor: 0x8B0000,
+          textColor: '#FFD700',
+          hoverBgColor: 0x8B0000,
+          hoverBorderColor: 0xFFD700,
+          hoverTextColor: '#FFFFFF',
+          glowEffect: true,
+          shadowEffect: true
+        }
+      );
+      
+      // Enhanced Back button
+      GothicTitleUtils.createEnhancedGothicButton(
+        this,
+        width / 2,
+        buttonsY + buttonSpacing,
+        backButtonDims.width,
+        backButtonDims.height,
+        'Back',
+        () => this.goBack(),
+        {
+          fontSize: ResponsiveLayout.getButtonFontSize(16, width, height),
+          bgColor: 0x2d1b1b,
+          borderColor: 0x666666,
+          textColor: '#F5F5DC',
+          hoverBgColor: 0x4a0000,
+          hoverBorderColor: 0x8B0000,
+          hoverTextColor: '#FFD700',
+          glowEffect: false,
+          shadowEffect: true
+        }
+      );
+    } else {
+      // Horizontal layout for desktop and mobile landscape
+      const buttonsY = ResponsiveLayout.getAnchoredPosition('bottom-center', 0, 100 * uiScale, width, height).y;
+      const buttonSpacing = Math.max(40, 80 * uiScale);
+      
+      // Enhanced Create character button
+      GothicTitleUtils.createEnhancedGothicButton(
+        this,
+        width / 2 - buttonSpacing,
+        buttonsY,
+        createButtonDims.width,
+        createButtonDims.height,
+        'Create Champion',
+        () => this.createCharacter(),
+        {
+          fontSize: ResponsiveLayout.getButtonFontSize(18, width, height),
+          bgColor: 0x4a0000,
+          borderColor: 0x8B0000,
+          textColor: '#FFD700',
+          hoverBgColor: 0x8B0000,
+          hoverBorderColor: 0xFFD700,
+          hoverTextColor: '#FFFFFF',
+          glowEffect: true,
+          shadowEffect: true
+        }
+      );
+      
+      // Enhanced Back button
+      GothicTitleUtils.createEnhancedGothicButton(
+        this,
+        width / 2 + buttonSpacing,
+        buttonsY,
+        backButtonDims.width,
+        backButtonDims.height,
+        'Back',
+        () => this.goBack(),
+        {
+          fontSize: ResponsiveLayout.getButtonFontSize(16, width, height),
+          bgColor: 0x2d1b1b,
+          borderColor: 0x666666,
+          textColor: '#F5F5DC',
+          hoverBgColor: 0x4a0000,
+          hoverBorderColor: 0x8B0000,
+          hoverTextColor: '#FFD700',
+          glowEffect: false,
+          shadowEffect: true
+        }
+      );
+    }
   }
 
   private selectClass(className: string) {
@@ -470,6 +609,7 @@ export class CharacterCreationScene extends Scene {
   
   private showSuccess(message: string) {
     const { width, height } = this.scale;
+    const uiScale = ResponsiveLayout.getUIScale(width, height);
     
     // Remove existing messages
     const existingMessage = this.children.getByName('success-message');
@@ -477,13 +617,16 @@ export class CharacterCreationScene extends Scene {
       existingMessage.destroy();
     }
     
-    // Show success message
-    const successText = this.add.text(width / 2, height * 0.9, message, {
-      fontSize: '18px',
+    // Show success message with responsive positioning
+    const messagePos = ResponsiveLayout.getAnchoredPosition('bottom-center', 0, 50 * uiScale, width, height);
+    const successText = this.add.text(messagePos.x, messagePos.y, message, {
+      fontSize: `${ResponsiveLayout.getScaledFontSize(16, width, height)}px`,
       color: '#228B22',
       fontFamily: 'Cinzel, serif',
       backgroundColor: '#000000',
-      padding: { x: 15, y: 8 }
+      padding: { x: Math.max(10, 15 * uiScale), y: Math.max(6, 8 * uiScale) },
+      align: 'center',
+      wordWrap: { width: Math.min(400, width * 0.8) }
     }).setOrigin(0.5).setName('success-message');
     
     // Fade out after showing
@@ -523,6 +666,7 @@ export class CharacterCreationScene extends Scene {
 
   private showError(message: string) {
     const { width, height } = this.scale;
+    const uiScale = ResponsiveLayout.getUIScale(width, height);
     
     // Remove existing error
     const existingError = this.children.getByName('error-message');
@@ -530,13 +674,16 @@ export class CharacterCreationScene extends Scene {
       existingError.destroy();
     }
     
-    // Show error message
-    const errorText = this.add.text(width / 2, height * 0.9, message, {
-      fontSize: '16px',
+    // Show error message with responsive positioning
+    const messagePos = ResponsiveLayout.getAnchoredPosition('bottom-center', 0, 50 * uiScale, width, height);
+    const errorText = this.add.text(messagePos.x, messagePos.y, message, {
+      fontSize: `${ResponsiveLayout.getScaledFontSize(14, width, height)}px`,
       color: '#DC143C',
       fontFamily: 'Cinzel, serif',
       backgroundColor: '#000000',
-      padding: { x: 10, y: 5 }
+      padding: { x: Math.max(8, 10 * uiScale), y: Math.max(4, 5 * uiScale) },
+      align: 'center',
+      wordWrap: { width: Math.min(400, width * 0.8) }
     }).setOrigin(0.5).setName('error-message');
     
     // Auto-hide after 3 seconds
@@ -577,6 +724,5 @@ export class CharacterCreationScene extends Scene {
 
   destroy() {
     this.cleanupForm();
-    super.destroy();
   }
 }
