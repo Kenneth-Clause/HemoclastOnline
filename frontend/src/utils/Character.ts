@@ -38,6 +38,9 @@ export class Character extends Phaser.GameObjects.Container {
   private currentPathIndex: number = 0;
   private pathMoveSpeed: number;
   
+  // Tween-based movement tracking
+  private _isUsingTweenMovement: boolean = false;
+  
   // Movement directions (8-directional)
   private directions: { [key: string]: Direction } = {
     'up': { x: 0, y: -1, key: 'up' },
@@ -182,9 +185,13 @@ export class Character extends Phaser.GameObjects.Container {
   }
 
   private updateKeyboardMovement(): void {
+    // Calculate frame-rate independent movement
+    const deltaTime = this.scene.game.loop.delta / 1000; // Convert to seconds
+    const frameSpeed = this.speed * 60 * deltaTime; // Consistent speed regardless of framerate
+    
     // Calculate movement with normalized diagonal speed
-    let deltaX = this.currentDirection.x * this.speed;
-    let deltaY = this.currentDirection.y * this.speed;
+    let deltaX = this.currentDirection.x * frameSpeed;
+    let deltaY = this.currentDirection.y * frameSpeed;
     
     // Normalize diagonal movement to prevent faster diagonal movement
     if (this.currentDirection.x !== 0 && this.currentDirection.y !== 0) {
@@ -214,19 +221,26 @@ export class Character extends Phaser.GameObjects.Container {
     const dy = target.y - this.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
     
-    // Check if we're close enough to the current target
-    if (distance < this.pathMoveSpeed + 2) {
+    // Use a more precise threshold for smoother movement
+    if (distance < 2) {
       // Move to next waypoint
       this.currentPathIndex++;
       return;
     }
     
-    // Move towards current target
+    // Calculate smooth movement speed (frame-rate independent)
+    const deltaTime = this.scene.game.loop.delta / 1000; // Convert to seconds
+    const moveSpeed = this.speed * 60 * deltaTime; // Same speed as WASD movement
+    
+    // Move towards current target with smooth interpolation
     const directionX = dx / distance;
     const directionY = dy / distance;
     
-    this.x += directionX * this.pathMoveSpeed;
-    this.y += directionY * this.pathMoveSpeed;
+    // Use the smaller of: calculated movement or remaining distance
+    const actualMoveDistance = Math.min(moveSpeed, distance);
+    
+    this.x += directionX * actualMoveDistance;
+    this.y += directionY * actualMoveDistance;
     
     // Update visual direction for path following
     this.updateVisualDirectionFromVector(directionX, directionY);
@@ -360,6 +374,56 @@ export class Character extends Phaser.GameObjects.Container {
     });
   }
 
+  // Enhanced smooth click-to-move for short distances
+  public smoothMoveToPosition(targetX: number, targetY: number, tileMap?: any, onComplete?: () => void): void {
+    const dx = targetX - this.x;
+    const dy = targetY - this.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    // For short distances, use smooth tweening instead of pathfinding
+    if (distance < 100) {
+      // Stop any current movement
+      this.stopMoving();
+      this.stopPathFollowing();
+      
+      // Calculate direction for animation
+      const directionX = Math.sign(dx);
+      const directionY = Math.sign(dy);
+      const directionKey = this.getDirectionKey(directionX, directionY);
+      
+      // Set moving state and direction
+      this.isMoving = true;
+      this._isUsingTweenMovement = true; // Mark as using tween movement
+      this.currentDirection = { x: directionX, y: directionY, key: directionKey };
+      this.updateAnimation();
+      this.updateVisualDirection();
+      
+      // Calculate duration based on distance for consistent speed
+      const duration = (distance / this.speed) * 16.67; // Approximately 60 FPS timing
+      
+      // Create smooth movement tween
+      this.scene.tweens.add({
+        targets: this,
+        x: targetX,
+        y: targetY,
+        duration: duration,
+        ease: 'Sine.easeOut',
+        onComplete: () => {
+          // Stop movement when complete
+          this._isUsingTweenMovement = false; // Clear tween movement flag
+          this.stopMoving();
+          // Notify the GameScene that movement is complete
+          if (onComplete) {
+            onComplete();
+          }
+        }
+      });
+    } else {
+      // For longer distances, use pathfinding
+      this.moveToPosition(targetX, targetY, tileMap);
+    }
+  }
+
   // Nameplate management methods
   public showNameplate(): void {
     if (this.nameplate) {
@@ -401,7 +465,11 @@ export class Character extends Phaser.GameObjects.Container {
 
   // Pathfinding status methods
   public isFollowingPath(): boolean {
-    return this._isFollowingPath;
+    return this._isFollowingPath || this._isUsingTweenMovement;
+  }
+
+  public isUsingTweenMovement(): boolean {
+    return this._isUsingTweenMovement;
   }
 
   public getCurrentPath(): { x: number; y: number }[] {
@@ -413,6 +481,30 @@ export class Character extends Phaser.GameObjects.Container {
       current: this.currentPathIndex,
       total: this.currentPath.length
     };
+  }
+
+  // Animation and movement state methods
+  public getCurrentDirection(): Direction {
+    return this.currentDirection;
+  }
+
+  public isCurrentlyMoving(): boolean {
+    return this.isMoving;
+  }
+
+  public setAnimationState(direction: string, isMoving: boolean): void {
+    // Handle idle state specially
+    if (direction === 'idle') {
+      this.currentDirection = { x: 0, y: 0, key: 'idle' };
+      this.isMoving = false; // Force idle state
+      this.updateAnimation();
+      this.updateVisualDirection();
+    } else if (this.directions[direction]) {
+      this.currentDirection = this.directions[direction];
+      this.isMoving = isMoving;
+      this.updateAnimation();
+      this.updateVisualDirection();
+    }
   }
 
   // Clean up character and nameplate

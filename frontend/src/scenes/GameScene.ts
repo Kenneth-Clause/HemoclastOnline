@@ -26,14 +26,15 @@ export class GameScene extends Scene {
   private movementBroadcastTimer: Phaser.Time.TimerEvent | null = null;
   private lastBroadcastTime: number = 0;
   private isPathfinding: boolean = false; // Track if character is following a path
-  private readonly MOVEMENT_BROADCAST_INTERVAL = 120; // Moderate frequency (8.3 FPS) to prevent spam
-  private readonly MIN_MOVEMENT_DISTANCE = 4; // Balanced threshold to reduce noise
-  private readonly MAX_BROADCAST_DELAY = 160; // Moderate delay for better batching
+  private readonly MOVEMENT_BROADCAST_INTERVAL = 100; // Higher frequency (10 FPS) for smoother animations
+  private readonly MIN_MOVEMENT_DISTANCE = 3; // Lower threshold for more responsive movement
+  private readonly MAX_BROADCAST_DELAY = 120; // Shorter delay for better responsiveness
   private readonly POSITION_PRECISION = 1; // Round positions to nearest pixel for consistency
   
   // Multiplayer movement tracking
   private otherPlayerTargets: Map<string, { x: number, y: number, timestamp: number }> = new Map();
   private otherPlayerSmoothMovement: Map<string, Phaser.Tweens.Tween | null> = new Map();
+  private lastBroadcastDirection: string | null = null;
   
   // Game world settings
   private readonly TILE_SIZE = 32;
@@ -230,12 +231,13 @@ export class GameScene extends Scene {
     
     this.inputManager.onMovementStop(() => {
       if (this.character) {
+        console.log('🛑 Movement stopped - broadcasting final position');
         this.character.stopMoving();
         
         // Stop real-time broadcasting and send final position
         this.stopMovementBroadcasting();
         
-        // Send final precise position
+        // Send final precise position (this should broadcast 'idle' state)
         this.broadcastPlayerMovement(this.character.x, this.character.y);
       }
     });
@@ -250,8 +252,15 @@ export class GameScene extends Scene {
           const preciseTargetX = Math.round(targetPos.x / this.POSITION_PRECISION) * this.POSITION_PRECISION;
           const preciseTargetY = Math.round(targetPos.y / this.POSITION_PRECISION) * this.POSITION_PRECISION;
           
-          // Move character to clicked position using pathfinding
-          this.character.moveToPosition(preciseTargetX, preciseTargetY, this.tileMap);
+          // Move character to clicked position with enhanced smoothness
+          this.character.smoothMoveToPosition(preciseTargetX, preciseTargetY, this.tileMap, () => {
+            // Called when movement completes (for tween-based short distance moves)
+            this.isPathfinding = false;
+            this.stopMovementBroadcasting();
+            // Send final position to ensure other players see the character stop
+            this.broadcastPlayerMovement(this.character!.x, this.character!.y);
+            console.log('🎯 Click-to-move completed - broadcasting final idle state');
+          });
           
           // Mark as pathfinding and start broadcasting actual position during movement
           this.isPathfinding = true;
@@ -655,18 +664,32 @@ export class GameScene extends Scene {
         if (isStaleMessage || isLargeJump) {
           // Instant positioning for stale messages or large jumps
           otherPlayer.setPosition(preciseX, preciseY);
+          // Update animation state for instant moves
+          if (data.direction && data.isMoving !== undefined) {
+            otherPlayer.setAnimationState(data.direction, data.isMoving);
+          }
           console.log(`⚡ Instant sync ${clientId} to (${preciseX}, ${preciseY}) - ${isStaleMessage ? 'stale' : 'large jump'} (${distance.toFixed(1)}px)`);
-        } else if (distance > 8) {
-          // Smooth interpolation for medium distances
-          const moveDuration = Math.min(150, distance * 3); // Scale duration with distance
+        } else if (distance > 5) {
+          // Smooth interpolation for medium distances with improved easing
+          const moveDuration = Math.min(120, Math.max(80, distance * 2.5)); // Better duration scaling
           const smoothTween = this.tweens.add({
             targets: otherPlayer,
             x: preciseX,
             y: preciseY,
             duration: moveDuration,
-            ease: 'Power1.easeOut',
+            ease: 'Sine.easeOut', // Smoother easing function
+            onUpdate: () => {
+              // Update animation during movement for smoother appearance
+              if (data.direction && data.isMoving !== undefined) {
+                otherPlayer.setAnimationState(data.direction, data.isMoving);
+              }
+            },
             onComplete: () => {
               this.otherPlayerSmoothMovement.set(clientId, null);
+              // Ensure final animation state is set
+              if (data.direction && data.isMoving !== undefined) {
+                otherPlayer.setAnimationState(data.direction, data.isMoving);
+              }
             }
           });
           this.otherPlayerSmoothMovement.set(clientId, smoothTween);
@@ -674,7 +697,17 @@ export class GameScene extends Scene {
         } else if (distance > 1) {
           // Direct positioning for small distances
           otherPlayer.setPosition(preciseX, preciseY);
+          // Update animation state for small moves
+          if (data.direction && data.isMoving !== undefined) {
+            otherPlayer.setAnimationState(data.direction, data.isMoving);
+          }
           console.log(`📍 Precise sync ${clientId} to (${preciseX}, ${preciseY}) - micro-adjustment`);
+        } else {
+          // Very small movement - just update animation state without moving
+          if (data.direction && data.isMoving !== undefined) {
+            otherPlayer.setAnimationState(data.direction, data.isMoving);
+            console.log(`🎭 Animation update ${clientId}: ${data.direction}, moving: ${data.isMoving}`);
+          }
         }
         // If distance <= 1px, ignore to prevent jitter
       }
@@ -719,7 +752,10 @@ export class GameScene extends Scene {
     const preciseX = Math.round(x / this.POSITION_PRECISION) * this.POSITION_PRECISION;
     const preciseY = Math.round(y / this.POSITION_PRECISION) * this.POSITION_PRECISION;
     
-    // Check if we should broadcast based on distance OR time
+    // Get current direction for comparison
+    const currentDirection = this.character?.getCurrentDirection()?.key || 'idle';
+    
+    // Check if we should broadcast based on distance, time, OR direction change
     let shouldBroadcast = false;
     
     if (!this.lastBroadcastPosition) {
@@ -730,18 +766,22 @@ export class GameScene extends Scene {
       const dy = Math.abs(preciseY - this.lastBroadcastPosition.y);
       const distance = Math.sqrt(dx * dx + dy * dy);
       const timeSinceLastBroadcast = currentTime - this.lastBroadcastTime;
+      const directionChanged = currentDirection !== this.lastBroadcastDirection;
       
-      // Broadcast if either:
-      // 1. Moved any distance (maximum precision)
+      // Broadcast if any of these conditions are met:
+      // 1. Moved significant distance
       // 2. Time limit exceeded (ensures consistency)
+      // 3. Direction changed (for animation updates)
       shouldBroadcast = distance >= this.MIN_MOVEMENT_DISTANCE || 
-                       timeSinceLastBroadcast >= this.MAX_BROADCAST_DELAY;
+                       timeSinceLastBroadcast >= this.MAX_BROADCAST_DELAY ||
+                       directionChanged;
     }
     
     if (shouldBroadcast) {
       // Update tracking variables with precise coordinates
       this.lastBroadcastPosition = { x: preciseX, y: preciseY };
       this.lastBroadcastTime = currentTime;
+      this.lastBroadcastDirection = currentDirection;
       
       // Send the precise movement update
       this.broadcastPlayerMovement(preciseX, preciseY);
@@ -764,6 +804,10 @@ export class GameScene extends Scene {
     const characterName = gameState.currentCharacter?.name || 
                          'Unknown Character';
     
+    // Get current animation state from character
+    const currentDirection = this.character?.getCurrentDirection();
+    const isMoving = this.character?.isCurrentlyMoving() || false;
+    
     const moveMessage = {
       type: 'player_move',
       data: {
@@ -771,6 +815,8 @@ export class GameScene extends Scene {
         character_id: localStorage.getItem('hemoclast_character_id'),
         character_name: characterName, // Using actual character name
         position: { x: preciseX, y: preciseY }, // Use precise coordinates
+        direction: currentDirection?.key || 'idle', // Animation direction
+        isMoving: isMoving, // Movement state
         timestamp: Date.now()
       }
     };
