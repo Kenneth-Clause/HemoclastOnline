@@ -552,12 +552,10 @@ body::before {
   border-radius: 6px !important;
   color: var(--bone-white) !important;
   font-family: 'Cinzel', serif !important;
-  font-size: 16px !important;
-  padding: 12px 16px !important;
   margin: 5px 0 !important;
-  width: 100% !important;
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5) !important;
   transition: all 0.3s ease !important;
+  /* Size, font-size, and padding are now set by JavaScript using the same scaling system as buttons */
 }
 
 .gothic-input:focus {
@@ -742,8 +740,8 @@ body::before {
   }
   
   .gothic-input {
-    font-size: 16px !important; /* Prevent zoom on iOS */
-    padding: 14px 16px !important;
+    /* All sizing is now handled by JavaScript using ResponsiveLayout system */
+    font-size: 16px !important; /* Prevent zoom on iOS - will be overridden by JS */
   }
 }
 

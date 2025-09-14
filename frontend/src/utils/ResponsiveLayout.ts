@@ -13,17 +13,13 @@ export class ResponsiveLayout {
    * Get the current UI scale factor based on screen size
    */
   static getUIScale(currentWidth: number, currentHeight: number): number {
-    // Ensure minimum dimensions are respected
-    const effectiveWidth = Math.max(currentWidth, this.minWidth);
-    const effectiveHeight = Math.max(currentHeight, this.minHeight);
+    // Calculate scale based on actual screen dimensions (no artificial minimums)
+    const scaleX = currentWidth / this.baseWidth;
+    const scaleY = currentHeight / this.baseHeight;
     
-    // Calculate scale based on the smaller dimension to maintain aspect ratio
-    const scaleX = effectiveWidth / this.baseWidth;
-    const scaleY = effectiveHeight / this.baseHeight;
-    
-    // Use minimum scale to ensure everything fits, but clamp to reasonable bounds
+    // Use minimum scale to ensure everything fits, with reasonable bounds
     const scale = Math.min(scaleX, scaleY);
-    return Math.max(0.6, Math.min(1.5, scale)); // Clamp between 60% and 150% for better usability
+    return Math.max(0.2, Math.min(1.5, scale)); // Allow scaling down to 20% for very small screens
   }
   
   /**

@@ -89,7 +89,6 @@ export class CharacterSelectionScene extends Scene {
       fontSize: `${Math.min(width, height) / 40}px`,
       color: '#F5F5DC',
       fontFamily: 'Cinzel, serif',
-      fontWeight: '600',
       stroke: '#000000',
       strokeThickness: 1
     }).setOrigin(0.5);
@@ -135,8 +134,7 @@ export class CharacterSelectionScene extends Scene {
       this.add.text(width / 2, height * 0.28, '⚠️ Guest Account Warning', {
         fontSize: `${baseFontSize * 1.2}px`,
         color: '#FFD700',
-        fontFamily: 'Cinzel, serif',
-        fontWeight: '600'
+        fontFamily: 'Cinzel, serif'
       }).setOrigin(0.5);
       
       this.add.text(width / 2, height * 0.30, 'Your progress is stored locally. Create an account to secure your data!', {
@@ -145,25 +143,17 @@ export class CharacterSelectionScene extends Scene {
         fontFamily: 'Cinzel, serif'
       }).setOrigin(0.5);
       
-      // Create account button
-      const createAccountBtn = this.add.text(width - 100, height * 0.30, 'Create Account →', {
-        fontSize: `${baseFontSize}px`,
-        color: '#FFD700',
-        fontFamily: 'Cinzel, serif',
-        fontWeight: '600'
-      }).setOrigin(0.5).setInteractive();
-      
-      createAccountBtn.on('pointerover', () => {
-        createAccountBtn.setColor('#FFFFFF');
-      });
-      
-      createAccountBtn.on('pointerout', () => {
-        createAccountBtn.setColor('#FFD700');
-      });
-      
-      createAccountBtn.on('pointerdown', () => {
-        this.upgradeGuestAccount();
-      });
+      // Create account button - proper button instead of text link
+      GraphicsUtils.createRuneScapeButton(
+        this,
+        width - 120,
+        height * 0.30,
+        180,
+        40,
+        'Create Account',
+        baseFontSize * 0.9,
+        () => this.upgradeGuestAccount()
+      );
     }
   }
 
@@ -242,7 +232,7 @@ export class CharacterSelectionScene extends Scene {
     const borderColor = character ? (isSelected ? 0xFFD700 : 0x8B0000) : 0x666666;
     const borderWidth = character ? (isSelected ? 4 : 3) : 2;
     
-    const slotBg = GraphicsUtils.createUIPanel(
+    GraphicsUtils.createUIPanel(
       this,
       x - width/2,
       y - height/2,
@@ -304,8 +294,7 @@ export class CharacterSelectionScene extends Scene {
     this.add.text(x, y - 10, character.name, {
       fontSize: `${fontSize * 1.2}px`,
       color: '#F5F5DC',
-      fontFamily: 'Cinzel, serif',
-      fontWeight: '600'
+      fontFamily: 'Cinzel, serif'
     }).setOrigin(0.5);
     
     // Character class and level
@@ -316,7 +305,7 @@ export class CharacterSelectionScene extends Scene {
     }).setOrigin(0.5);
     
     // Select button (changed from Play)
-    const selectButton = GraphicsUtils.createRuneScapeButton(
+    GraphicsUtils.createRuneScapeButton(
       this,
       x,
       y + 80,
@@ -333,7 +322,6 @@ export class CharacterSelectionScene extends Scene {
       fontSize: `${fontSize * 0.8}px`,
       color: '#FFD700',
       fontFamily: 'Cinzel, serif',
-      fontWeight: '600',
       stroke: '#000000',
       strokeThickness: 1
     }).setOrigin(0.5);
@@ -387,7 +375,7 @@ export class CharacterSelectionScene extends Scene {
     });
   }
 
-  private displayEmptySlot(x: number, y: number, slotIndex: number, fontSize: number) {
+  private displayEmptySlot(x: number, y: number, _slotIndex: number, fontSize: number) {
     // Empty slot icon
     this.add.text(x, y - 50, '➕', {
       fontSize: `${fontSize * 3}px`,
@@ -462,7 +450,7 @@ export class CharacterSelectionScene extends Scene {
     const creditsY = settingsY - buttonSpacing;
     
     // Credits button (top)
-    const creditsButton = GraphicsUtils.createRuneScapeButton(
+    GraphicsUtils.createRuneScapeButton(
       this,
       buttonX,
       creditsY,
@@ -474,7 +462,7 @@ export class CharacterSelectionScene extends Scene {
     );
     
     // Settings button (middle)
-    const settingsButton = GraphicsUtils.createRuneScapeButton(
+    GraphicsUtils.createRuneScapeButton(
       this,
       buttonX,
       settingsY,
@@ -486,7 +474,7 @@ export class CharacterSelectionScene extends Scene {
     );
     
     // Logout button (bottom)
-    const logoutButton = GraphicsUtils.createRuneScapeButton(
+    GraphicsUtils.createRuneScapeButton(
       this,
       buttonX,
       logoutY,
@@ -564,7 +552,6 @@ export class CharacterSelectionScene extends Scene {
       fontSize: '18px',
       color: '#FFD700',
       fontFamily: 'Cinzel, serif',
-      fontWeight: '600',
       stroke: '#000000',
       strokeThickness: 1
     }).setOrigin(0.5);
@@ -617,7 +604,6 @@ export class CharacterSelectionScene extends Scene {
       fontSize: '20px',
       color: '#FFD700',
       fontFamily: 'Cinzel, serif',
-      fontWeight: '700',
       stroke: '#000000',
       strokeThickness: 1
     }).setOrigin(0.5).setDepth(202);
@@ -626,8 +612,7 @@ export class CharacterSelectionScene extends Scene {
     const warning1 = this.add.text(width / 2, height / 2 - 60, 'This action CANNOT be undone!', {
       fontSize: '16px',
       color: '#F5F5DC',
-      fontFamily: 'Cinzel, serif',
-      fontWeight: '600'
+      fontFamily: 'Cinzel, serif'
     }).setOrigin(0.5).setDepth(202);
     
     const warning2 = this.add.text(width / 2, height / 2 - 35, 'All progress, items, and achievements will be lost forever.', {
@@ -641,8 +626,7 @@ export class CharacterSelectionScene extends Scene {
     const instruction = this.add.text(width / 2, height / 2 - 5, 'Type "DELETE" below to confirm:', {
       fontSize: '16px',
       color: '#F5F5DC',
-      fontFamily: 'Cinzel, serif',
-      fontWeight: '600'
+      fontFamily: 'Cinzel, serif'
     }).setOrigin(0.5).setDepth(202);
     
     // Create HTML input for typing DELETE and buttons
@@ -675,6 +659,13 @@ export class CharacterSelectionScene extends Scene {
       existingInput.remove();
     }
     
+    // Calculate responsive sizing for input with more aggressive scaling
+    const scale = Math.min(width / 1920, height / 1080);
+    const scaleFactor = Math.pow(scale, 0.7); // More aggressive scaling for small screens
+    const inputWidth = Math.max(160, 280 * scaleFactor); // Reduced minimum width
+    const fontSize = Math.max(12, 18 * scaleFactor); // Reduced minimum font size
+    const padding = Math.max(8, 15 * scaleFactor); // Reduced minimum padding
+    
     // Create confirmation input positioned below the instruction text
     const confirmInput = document.createElement('input');
     confirmInput.type = 'text';
@@ -686,20 +677,21 @@ export class CharacterSelectionScene extends Scene {
       left: 50%;
       top: 55%;
       transform: translate(-50%, -50%);
-      width: 280px;
-      padding: 15px;
+      width: ${inputWidth}px;
+      padding: ${padding}px;
       background: rgba(10, 10, 10, 0.95);
       border: 3px solid #DC143C;
       border-radius: 8px;
       color: #F5F5DC;
       font-family: 'Cinzel', serif;
-      font-size: 18px;
+      font-size: ${fontSize}px;
       font-weight: 600;
       text-align: center;
       text-transform: uppercase;
       z-index: 1001;
       outline: none;
       letter-spacing: 2px;
+      min-height: 40px;
     `;
     
     // Create the bottom buttons first
@@ -707,7 +699,6 @@ export class CharacterSelectionScene extends Scene {
       fontSize: '16px',
       color: '#FFFFFF',
       fontFamily: 'Cinzel, serif',
-      fontWeight: '700',
       backgroundColor: '#DC143C',
       padding: { x: 25, y: 10 }
     }).setOrigin(0.5).setDepth(202).setInteractive({ useHandCursor: true });
@@ -716,7 +707,6 @@ export class CharacterSelectionScene extends Scene {
       fontSize: '16px',
       color: '#F5F5DC',
       fontFamily: 'Cinzel, serif',
-      fontWeight: '600',
       backgroundColor: '#666666',
       padding: { x: 25, y: 10 }
     }).setOrigin(0.5).setDepth(202).setInteractive({ useHandCursor: true });
@@ -908,35 +898,36 @@ export class CharacterSelectionScene extends Scene {
   }
 
   private upgradeGuestAccount() {
-    // Show upgrade dialog
+    // Show upgrade dialog with improved messaging about data preservation
     const { width, height } = this.scale;
     
     // Create modal overlay
     const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.8);
     overlay.setDepth(100);
     
-    // Dialog panel
+    // Dialog panel - made taller for more content
     const panel = GraphicsUtils.createUIPanel(
       this,
-      width / 2 - 250,
-      height / 2 - 150,
-      500,
-      300,
+      width / 2 - 300,
+      height / 2 - 200,
+      600,
+      400,
       0x2d1b1b,
       0x8B0000,
       3
     );
     panel.setDepth(101);
     
-    // Dialog content
-    this.add.text(width / 2, height / 2 - 100, 'Secure Your Progress', {
+    // Dialog title
+    const title = this.add.text(width / 2, height / 2 - 150, 'Secure Your Progress', {
       fontSize: '24px',
       color: '#8B0000',
       fontFamily: 'Nosifer, serif'
     }).setOrigin(0.5).setDepth(102);
     
-    this.add.text(width / 2, height / 2 - 50, 
-      'Create a permanent account to:\n• Secure your characters and progress\n• Access from any device\n• Receive exclusive rewards', {
+    // Enhanced description with data preservation info
+    const description = this.add.text(width / 2, height / 2 - 80, 
+      'Create a permanent account to:\n• Keep all your characters and progress\n• Access from any device\n• Secure your data in the cloud\n• Receive exclusive rewards\n\n✅ Your current characters will be preserved!', {
       fontSize: '16px',
       color: '#F5F5DC',
       fontFamily: 'Cinzel, serif',
@@ -944,18 +935,30 @@ export class CharacterSelectionScene extends Scene {
       lineSpacing: 8
     }).setOrigin(0.5).setDepth(102);
     
+    // Character count info if they have characters
+    let characterInfo: Phaser.GameObjects.Text | null = null;
+    if (this.characters && this.characters.length > 0) {
+      const charCount = this.characters.filter(char => char !== null).length;
+      characterInfo = this.add.text(width / 2, height / 2 + 20, 
+        `${charCount} character${charCount !== 1 ? 's' : ''} will be transferred to your new account`, {
+        fontSize: '14px',
+        color: '#FFD700',
+        fontFamily: 'Cinzel, serif',
+        fontStyle: 'italic'
+      }).setOrigin(0.5).setDepth(102);
+    }
+    
     // Create account button
     const createBtn = GraphicsUtils.createRuneScapeButton(
       this,
       width / 2 - 80,
-      height / 2 + 50,
+      height / 2 + 80,
       140,
       40,
       'Create Account',
       14,
       () => {
-        this.cleanupForm();
-        this.scene.start('LoginScene');
+        this.initiateAccountUpgrade();
       }
     );
     createBtn.background.setDepth(102);
@@ -965,22 +968,49 @@ export class CharacterSelectionScene extends Scene {
     const continueBtn = GraphicsUtils.createRuneScapeButton(
       this,
       width / 2 + 80,
-      height / 2 + 50,
+      height / 2 + 80,
       140,
       40,
       'Continue as Guest',
       14,
       () => {
-        overlay.destroy();
-        panel.destroy();
-        createBtn.background.destroy();
-        createBtn.text.destroy();
-        continueBtn.background.destroy();
-        continueBtn.text.destroy();
+        this.closeUpgradeDialog([overlay, panel, title, description, characterInfo, createBtn.background, createBtn.text, continueBtn.background, continueBtn.text]);
       }
     );
     continueBtn.background.setDepth(102);
     continueBtn.text.setDepth(103);
+  }
+  
+  private closeUpgradeDialog(elements: (Phaser.GameObjects.GameObject | null)[]) {
+    elements.forEach(element => {
+      if (element && element.destroy) {
+        element.destroy();
+      }
+    });
+  }
+  
+  private initiateAccountUpgrade() {
+    // Store a flag indicating this is an upgrade from guest account
+    localStorage.setItem('hemoclast_upgrading_guest', 'true');
+    
+    // Store current character data for preservation
+    if (this.characters && this.characters.length > 0) {
+      localStorage.setItem('hemoclast_guest_characters', JSON.stringify(this.characters));
+    }
+    
+    // Store current player data
+    const currentPlayerId = localStorage.getItem('hemoclast_player_id');
+    const currentUsername = localStorage.getItem('hemoclast_username');
+    if (currentPlayerId && currentUsername) {
+      localStorage.setItem('hemoclast_guest_player_data', JSON.stringify({
+        playerId: currentPlayerId,
+        username: currentUsername
+      }));
+    }
+    
+    // Navigate to login scene for account creation
+    this.cleanupForm();
+    this.scene.start('LoginScene');
   }
 
   private logout() {

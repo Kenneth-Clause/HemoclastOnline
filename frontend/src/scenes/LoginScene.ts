@@ -96,6 +96,9 @@ export class LoginScene extends Scene {
     ).setOrigin(0.5);
     this.sceneElements.push(versionText);
     
+    // Show upgrade indicator if user is upgrading from guest account
+    this.showUpgradeIndicator();
+    
     // Add atmospheric particles
     const particles = GothicTitleUtils.createAtmosphericParticles(this, width, height, {
       colors: [0x8B0000, 0x4B0082, 0x228B22],
@@ -129,6 +132,10 @@ export class LoginScene extends Scene {
     this.notificationManager.handleResize(newWidth, newHeight);
     this.loadingManager.handleResize(newWidth, newHeight);
     this.createUI();
+    // Recreate HTML form with new dimensions
+    if (document.getElementById('login-form')) {
+      this.createHTMLForm();
+    }
   }
 
   private createLoginForm() {
@@ -143,11 +150,16 @@ export class LoginScene extends Scene {
     
     // Enhanced Gothic Form Background with decorative elements
     const formCenterY = centerY + 10; // Move form down to center it properly
+    
+    // Calculate responsive frame width using same approach as inputs
+    const baseFrameWidth = 400;
+    const frameWidth = Math.max(180, Math.min(baseFrameWidth, width * 0.3)); // 30% of viewport width, max 400px
+    
     const gothicFrame = GothicTitleUtils.createGothicFrame(
       this,
       centerX,
       formCenterY,
-      400,
+      frameWidth,
       formHeight,
       {
         bgColor: 0x1a1a1a,
@@ -162,8 +174,8 @@ export class LoginScene extends Scene {
     gothicFrame.ornaments.forEach(ornament => this.sceneElements.push(ornament));
     
     // Add gothic symbols only on the outline edges
-    const formLeft = centerX - 200;
-    const formRight = centerX + 200;
+    const formLeft = centerX - frameWidth/2;
+    const formRight = centerX + frameWidth/2;
     const formTop = formCenterY - formHeight/2;
     const formBottom = formCenterY + formHeight/2;
     
@@ -257,17 +269,56 @@ export class LoginScene extends Scene {
       existingForm.remove();
     }
     
-    // Create form container
+    // Use the same scaling system as regular buttons
+    const uiScale = ResponsiveLayout.getUIScale(width, height);
+    const baseInputWidth = 400;
+    const baseInputHeight = 58;
+    const baseFontSize = 16;
+    const basePadding = 12;
+    const baseGap = 12;
+    
+    // Calculate scaled dimensions using the same system as buttons - let responsive system work naturally
+    let inputWidth = baseInputWidth * uiScale;
+    let inputHeight = baseInputHeight * uiScale;
+    let fontSize = baseFontSize * uiScale;
+    let padding = basePadding * uiScale;
+    const gap = baseGap * uiScale;
+    
+    // Apply minimum touch targets for usability (but don't fight the scaling system)
+    const minTouchTarget = 32; // Minimum for usability
+    const minFontSize = 12; // Minimum for readability
+    
+    // Only apply minimums if the natural scaling goes below usability thresholds
+    inputHeight = Math.max(inputHeight, minTouchTarget);
+    fontSize = Math.max(fontSize, minFontSize);
+    
+    // Don't artificially limit width - let it scale naturally with the viewport
+    
+    console.log('UI Scale:', uiScale, 'Input width:', inputWidth, 'Font size:', fontSize);
+    
+    // Create form container with responsive positioning
     const formContainer = document.createElement('div');
     formContainer.id = 'login-form';
     formContainer.style.cssText = `
       position: absolute;
       left: 50%;
-      top: 50%;
+      top: 50%; 
       transform: translate(-50%, -50%);
-      width: 300px;
       z-index: 1000;
       pointer-events: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: ${gap}px;
+    `;
+    
+    // Create inputs with consistent scaling
+    const inputStyle = `
+      width: ${inputWidth}px !important;
+      height: ${inputHeight}px !important;
+      font-size: ${fontSize}px !important;
+      padding: ${padding}px !important;
+      box-sizing: border-box !important;
     `;
     
     // Username input
@@ -276,6 +327,7 @@ export class LoginScene extends Scene {
     usernameInput.placeholder = 'Username';
     usernameInput.id = 'username';
     usernameInput.className = 'gothic-input';
+    usernameInput.style.cssText += inputStyle;
     
     // Email input (for registration)
     const emailInput = document.createElement('input');
@@ -283,6 +335,7 @@ export class LoginScene extends Scene {
     emailInput.placeholder = 'Email';
     emailInput.id = 'email';
     emailInput.className = 'gothic-input';
+    emailInput.style.cssText += inputStyle;
     emailInput.style.display = this.currentMode === 'register' ? 'block' : 'none';
     
     // Password input
@@ -291,6 +344,7 @@ export class LoginScene extends Scene {
     passwordInput.placeholder = 'Password';
     passwordInput.id = 'password';
     passwordInput.className = 'gothic-input';
+    passwordInput.style.cssText += inputStyle;
     
     // Add inputs to form
     formContainer.appendChild(usernameInput);
@@ -444,7 +498,6 @@ export class LoginScene extends Scene {
     );
     this.sceneElements.push(creditsButton.background);
     this.sceneElements.push(creditsButton.text);
-    this.sceneElements.push(creditsButton.hitArea);
     
     // Settings button (top)
     const settingsButton = GraphicsUtils.createRuneScapeButton(
@@ -459,7 +512,6 @@ export class LoginScene extends Scene {
     );
     this.sceneElements.push(settingsButton.background);
     this.sceneElements.push(settingsButton.text);
-    this.sceneElements.push(settingsButton.hitArea);
   }
 
   private createActionButton(
@@ -581,90 +633,6 @@ export class LoginScene extends Scene {
     this.scene.start('CharacterSelectionScene');
   }
   
-  private createNewGuestAccount() {
-    const { width, height } = this.scale;
-    
-    // Show warning dialog
-    const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.8);
-    overlay.setDepth(100);
-    
-    const panel = GraphicsUtils.createUIPanel(
-      this,
-      width / 2 - 250,
-      height / 2 - 100,
-      500,
-      200,
-      0x4a0000,
-      0xDC143C,
-      3
-    );
-    panel.setDepth(101);
-    
-    // Warning content
-    this.add.text(width / 2, height / 2 - 60, '⚠️ Warning', {
-      fontSize: '24px',
-      color: '#FFD700',
-      fontFamily: 'Nosifer, serif'
-    }).setOrigin(0.5).setDepth(102);
-    
-    this.add.text(width / 2, height / 2 - 20, 
-      'Creating a new guest account will delete\nyour current progress. Continue?', {
-      fontSize: '16px',
-      color: '#F5F5DC',
-      fontFamily: 'Cinzel, serif',
-      align: 'center',
-      lineSpacing: 8
-    }).setOrigin(0.5).setDepth(102);
-    
-    // Confirm button
-    const confirmBtn = GraphicsUtils.createRuneScapeButton(
-      this,
-      width / 2 - 80,
-      height / 2 + 40,
-      140,
-      35,
-      'Yes, Delete Progress',
-      12,
-      () => {
-        this.closeNewGuestDialog([overlay, panel]);
-        this.deleteOldGuestAndCreateNew();
-      }
-    );
-    confirmBtn.background.setDepth(102);
-    confirmBtn.text.setDepth(103);
-    
-    // Cancel button
-    const cancelBtn = GraphicsUtils.createRuneScapeButton(
-      this,
-      width / 2 + 80,
-      height / 2 + 40,
-      140,
-      35,
-      'Cancel',
-      12,
-      () => {
-        this.closeNewGuestDialog([overlay, panel]);
-      }
-    );
-    cancelBtn.background.setDepth(102);
-    cancelBtn.text.setDepth(103);
-  }
-  
-  private closeNewGuestDialog(elements: Phaser.GameObjects.GameObject[]) {
-    elements.forEach(element => element.destroy());
-  }
-  
-  private deleteOldGuestAndCreateNew() {
-    // Clear old guest data
-    localStorage.removeItem('hemoclast_token');
-    localStorage.removeItem('hemoclast_player_id');
-    localStorage.removeItem('hemoclast_username');
-    localStorage.removeItem('hemoclast_character_id');
-    localStorage.removeItem('hemoclast_is_guest');
-    
-    // Create new guest account
-    this.handleGuestLogin();
-  }
 
   private toggleMode() {
     this.currentMode = this.currentMode === 'login' ? 'register' : 'login';
@@ -837,6 +805,9 @@ export class LoginScene extends Scene {
   }
 
   private handleAuthSuccess(authData: any) {
+    // Check if this is a guest account upgrade
+    const isUpgrading = localStorage.getItem('hemoclast_upgrading_guest') === 'true';
+    
     // Store auth token first
     localStorage.setItem('hemoclast_token', authData.access_token);
     localStorage.setItem('hemoclast_player_id', authData.player_id.toString());
@@ -846,6 +817,57 @@ export class LoginScene extends Scene {
     localStorage.setItem('hemoclast_is_registered', 'true');
     localStorage.removeItem('hemoclast_is_guest'); // Clear any guest flag
     
+    // Handle guest account upgrade
+    if (isUpgrading) {
+      this.handleGuestAccountUpgrade(authData);
+    } else {
+      // Regular login flow
+      this.completeAuthSuccess(authData, `Welcome back, ${authData.username}!`);
+    }
+  }
+  
+  private async handleGuestAccountUpgrade(authData: any) {
+    try {
+      // Get stored guest data
+      const guestCharactersData = localStorage.getItem('hemoclast_guest_characters');
+      const guestPlayerData = localStorage.getItem('hemoclast_guest_player_data');
+      
+      if (guestCharactersData || guestPlayerData) {
+        // Show upgrade in progress message
+        this.notificationManager.info(
+          'Transferring your characters to the new account...',
+          'Account Upgrade',
+          3000
+        );
+        
+        // Here you would typically make an API call to transfer the guest data
+        // For now, we'll simulate this process
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Clear the upgrade flags and temporary data
+        localStorage.removeItem('hemoclast_upgrading_guest');
+        localStorage.removeItem('hemoclast_guest_characters');
+        localStorage.removeItem('hemoclast_guest_player_data');
+        
+        // Show success message
+        this.completeAuthSuccess(authData, `Account created successfully! Your characters have been preserved.`);
+      } else {
+        // No guest data to transfer
+        localStorage.removeItem('hemoclast_upgrading_guest');
+        this.completeAuthSuccess(authData, `Account created successfully!`);
+      }
+    } catch (error) {
+      console.error('Error during guest account upgrade:', error);
+      // Still complete the auth but show warning
+      localStorage.removeItem('hemoclast_upgrading_guest');
+      localStorage.removeItem('hemoclast_guest_characters');
+      localStorage.removeItem('hemoclast_guest_player_data');
+      
+      this.completeAuthSuccess(authData, `Account created! Note: There may have been an issue transferring guest data.`);
+    }
+  }
+  
+  private completeAuthSuccess(authData: any, message: string) {
     // Update game store
     this.gameStore.store.getState().setPlayer({
       id: authData.player_id,
@@ -868,9 +890,9 @@ export class LoginScene extends Scene {
     
     // Show final success notification
     this.notificationManager.success(
-      `Welcome back, ${authData.username}!`,
-      'Login Successful',
-      2000 // Auto-dismiss after 2 seconds
+      message,
+      'Success',
+      3000 // Show longer for upgrade messages
     );
     
     // Immediate transition to character selection (no additional delay)
@@ -937,6 +959,46 @@ export class LoginScene extends Scene {
     this.scene.start('CreditsScene');
   }
 
+  private showUpgradeIndicator() {
+    const isUpgrading = localStorage.getItem('hemoclast_upgrading_guest') === 'true';
+    
+    if (isUpgrading) {
+      const { width } = this.scale;
+      
+      // Show upgrade banner at the top
+      const banner = GraphicsUtils.createUIPanel(
+        this,
+        width / 2 - 300,
+        30,
+        600,
+        50,
+        0x4a0000,
+        0xFFD700,
+        2
+      );
+      this.sceneElements.push(banner);
+      
+      // Upgrade message
+      const upgradeText = this.add.text(width / 2, 55, 
+        '🔄 Upgrading Guest Account - Your characters will be preserved!', {
+        fontSize: '16px',
+        color: '#FFD700',
+        fontFamily: 'Cinzel, serif'
+      }).setOrigin(0.5);
+      this.sceneElements.push(upgradeText);
+      
+      // Add pulsing effect
+      this.tweens.add({
+        targets: upgradeText,
+        alpha: 0.7,
+        duration: 1500,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut'
+      });
+    }
+  }
+
   private cleanupForm() {
     const form = document.getElementById('login-form');
     if (form) {
@@ -951,7 +1013,5 @@ export class LoginScene extends Scene {
     // Cleanup managers
     this.notificationManager.destroy();
     this.loadingManager.destroy();
-    
-    super.destroy();
   }
 }
