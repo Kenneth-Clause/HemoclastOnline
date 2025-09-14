@@ -1,0 +1,11 @@
+# View all services
+docker-compose ps
+
+# View logs
+docker-compose logs -f
+
+# Stop services  
+docker-compose down
+
+# Restart with rebuild
+docker-compose up -d --build
