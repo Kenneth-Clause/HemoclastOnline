@@ -219,6 +219,15 @@ export class GameScene extends Scene {
     // Handle movement input
     this.inputManager.onMovementStart((direction: string) => {
       if (this.character) {
+        // WASD takes priority - cancel any ongoing click-to-move
+        if (this.isPathfinding) {
+          console.log('🎮 WASD interrupted click-to-move');
+          this.character.stopPathFollowing(); // Stop pathfinding
+          this.character.cancelTweenMovement(); // Stop any tween movement
+          this.isPathfinding = false;
+          this.stopMovementBroadcasting();
+        }
+        
         this.character.startMoving(direction);
         
         // Start real-time movement broadcasting
@@ -245,6 +254,13 @@ export class GameScene extends Scene {
     // Handle mouse/touch click movement
     this.inputManager.onMouseClickEvent((worldX: number, worldY: number) => {
       if (this.character && this.tileMap) {
+        // Click-to-move takes priority - stop any ongoing WASD movement
+        if (this.character.isCurrentlyMoving() && !this.isPathfinding) {
+          console.log('🖱️ Click-to-move interrupted WASD');
+          this.character.stopMoving(); // Stop WASD movement
+          this.stopMovementBroadcasting();
+        }
+        
         // Find nearest walkable tile
         const targetPos = this.tileMap.findNearestWalkableTile(worldX, worldY);
         if (targetPos) {

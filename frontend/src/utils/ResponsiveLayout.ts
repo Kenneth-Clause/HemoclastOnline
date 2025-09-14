@@ -17,9 +17,11 @@ export class ResponsiveLayout {
     const scaleX = currentWidth / this.baseWidth;
     const scaleY = currentHeight / this.baseHeight;
     
-    // Use minimum scale to ensure everything fits, with reasonable bounds
+    // Use minimum scale to ensure everything fits - no artificial bounds for infinite scaling
     const scale = Math.min(scaleX, scaleY);
-    return Math.max(0.2, Math.min(1.5, scale)); // Allow scaling down to 20% for very small screens
+    const finalScale = Math.max(0.05, Math.min(3.0, scale)); // Very wide range for infinite scaling
+    
+    return finalScale;
   }
   
   /**
@@ -75,7 +77,18 @@ export class ResponsiveLayout {
    */
   static getScaledFontSize(baseFontSize: number, currentWidth: number, currentHeight: number): number {
     const scale = this.getUIScale(currentWidth, currentHeight);
-    return Math.max(12, baseFontSize * scale); // Minimum 12px for readability
+    // Ensure text remains readable - 12px minimum for legibility
+    return Math.max(12, baseFontSize * scale);
+  }
+  
+  /**
+   * Get font size for button text that scales proportionally with button
+   * Uses lower minimum to allow button text to scale down with button
+   */
+  static getButtonFontSize(baseFontSize: number, currentWidth: number, currentHeight: number): number {
+    const scale = this.getUIScale(currentWidth, currentHeight);
+    // Allow button text to scale down more for proportional look - 8px minimum
+    return Math.max(8, baseFontSize * scale);
   }
   
   /**

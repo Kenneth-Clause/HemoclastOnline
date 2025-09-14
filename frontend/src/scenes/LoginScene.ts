@@ -132,9 +132,9 @@ export class LoginScene extends Scene {
     this.notificationManager.handleResize(newWidth, newHeight);
     this.loadingManager.handleResize(newWidth, newHeight);
     this.createUI();
-    // Recreate HTML form with new dimensions
+    // Recreate HTML form with new dimensions - use passed dimensions instead of this.scale
     if (document.getElementById('login-form')) {
-      this.createHTMLForm();
+      this.createHTMLFormWithDimensions(newWidth, newHeight);
     }
   }
 
@@ -262,6 +262,10 @@ export class LoginScene extends Scene {
 
   private createHTMLForm() {
     const { width, height } = this.scale;
+    this.createHTMLFormWithDimensions(width, height);
+  }
+
+  private createHTMLFormWithDimensions(width: number, height: number) {
     
     // Remove existing form if any
     const existingForm = document.getElementById('login-form');
@@ -269,10 +273,10 @@ export class LoginScene extends Scene {
       existingForm.remove();
     }
     
-    // Use the same scaling system as regular buttons
+    // Use the passed dimensions directly (not this.scale)
     const uiScale = ResponsiveLayout.getUIScale(width, height);
-    const baseInputWidth = 400;
-    const baseInputHeight = 58;
+    const baseInputWidth = 300;
+    const baseInputHeight = 55;
     const baseFontSize = 16;
     const basePadding = 12;
     const baseGap = 12;
@@ -284,17 +288,19 @@ export class LoginScene extends Scene {
     let padding = basePadding * uiScale;
     const gap = baseGap * uiScale;
     
-    // Apply minimum touch targets for usability (but don't fight the scaling system)
-    const minTouchTarget = 32; // Minimum for usability
-    const minFontSize = 12; // Minimum for readability
+    // Apply usability constraints - text must remain readable
+    const minTouchTarget = 32; // Adequate for touch interaction
+    const minFontSize = 12; // Minimum for text legibility
     
-    // Only apply minimums if the natural scaling goes below usability thresholds
+    // Smart input width: reasonable at all screen sizes
+    // Use a fixed reasonable width that works well at all scales
+    const reasonableInputWidth = Math.min(280, Math.max(180, width * 0.25)); // 25% of screen width, between 180px-280px
+    
+    // Ensure usability minimums are maintained
     inputHeight = Math.max(inputHeight, minTouchTarget);
     fontSize = Math.max(fontSize, minFontSize);
+    inputWidth = reasonableInputWidth; // Use the reasonable width instead of scaled width
     
-    // Don't artificially limit width - let it scale naturally with the viewport
-    
-    console.log('UI Scale:', uiScale, 'Input width:', inputWidth, 'Font size:', fontSize);
     
     // Create form container with responsive positioning
     const formContainer = document.createElement('div');
@@ -364,9 +370,14 @@ export class LoginScene extends Scene {
     const centerY = height / 2;
     const formCenterY = centerY + 10; // Match the form positioning
     
-    // Main action button (Login/Register) - positioned based on form type
-    const buttonWidth = 200;
-    const buttonHeight = 50;
+    // Get UI scale for responsive button sizing
+    const uiScale = ResponsiveLayout.getUIScale(width, height);
+    
+    // Main action button (Login/Register) - positioned based on form type with responsive sizing
+    const baseButtonWidth = 200;
+    const baseButtonHeight = 50;
+    const buttonWidth = Math.max(120, baseButtonWidth * uiScale);
+    const buttonHeight = Math.max(32, baseButtonHeight * uiScale);
     const buttonY = this.currentMode === 'register' ? formCenterY + 130 : formCenterY + 90; // Login form is shorter, needs less space
     
     const buttonBg = this.add.rectangle(centerX, buttonY, buttonWidth, buttonHeight, 0x2d1b1b)
@@ -375,13 +386,14 @@ export class LoginScene extends Scene {
     this.sceneElements.push(buttonBg);
     
     const buttonText = this.add.text(centerX, buttonY, 
-      this.currentMode === 'login' ? 'Sign In' : 'Create Account',
-      ResponsiveLayout.getTextStyle(16, width, height, {
-        color: '#F5F5DC',
-        fontFamily: 'Cinzel, serif',
-        fontWeight: '600'
-      })
-    ).setOrigin(0.5);
+      this.currentMode === 'login' ? 'Sign In' : 'Create Account', {
+      fontSize: `${ResponsiveLayout.getButtonFontSize(16, width, height)}px`,
+      color: '#F5F5DC',
+      fontFamily: 'Cinzel, serif',
+      fontWeight: '600',
+      stroke: '#000000',
+      strokeThickness: 1
+    }).setOrigin(0.5);
     this.sceneElements.push(buttonText);
     
     // Button hover effects
@@ -476,10 +488,12 @@ export class LoginScene extends Scene {
 
   private createBottomLeftButtons() {
     const { width, height } = this.scale;
-    const baseFontSize = Math.min(width, height) / 80;
     const buttonX = 100;
     const buttonSpacing = 45;
     const bottomMargin = 30;
+    
+    // Use responsive button font scaling
+    const buttonFontSize = ResponsiveLayout.getButtonFontSize(14, width, height);
     
     // Stack buttons vertically in bottom left corner
     const creditsY = height - bottomMargin;
@@ -493,7 +507,7 @@ export class LoginScene extends Scene {
       100,
       35,
       'Credits',
-      baseFontSize * 0.9,
+      buttonFontSize,
       () => this.goToCredits()
     );
     this.sceneElements.push(creditsButton.background);
@@ -507,7 +521,7 @@ export class LoginScene extends Scene {
       100,
       35,
       'Settings',
-      baseFontSize * 0.9,
+      buttonFontSize,
       () => this.goToSettings()
     );
     this.sceneElements.push(settingsButton.background);
@@ -517,8 +531,8 @@ export class LoginScene extends Scene {
   private createActionButton(
     x: number, 
     y: number, 
-    width: number, 
-    height: number, 
+    baseWidth: number, 
+    baseHeight: number, 
     text: string, 
     callback: () => void,
     bgColor: number = 0x4A4A4A,
@@ -526,19 +540,25 @@ export class LoginScene extends Scene {
     textColor: string = '#F5F5DC'
   ) {
     const { width: screenWidth, height: screenHeight } = this.scale;
+    const uiScale = ResponsiveLayout.getUIScale(screenWidth, screenHeight);
+    
+    // Scale the button dimensions
+    const width = Math.max(100, baseWidth * uiScale);
+    const height = Math.max(32, baseHeight * uiScale);
     
     const buttonBg = this.add.rectangle(x, y, width, height, bgColor)
       .setStrokeStyle(2, borderColor)
       .setInteractive();
     this.sceneElements.push(buttonBg);
     
-    const buttonText = this.add.text(x, y, text,
-      ResponsiveLayout.getTextStyle(16, screenWidth, screenHeight, {
-        color: textColor,
-        fontFamily: 'Cinzel, serif',
-        fontWeight: '600'
-      })
-    ).setOrigin(0.5);
+    const buttonText = this.add.text(x, y, text, {
+      fontSize: `${ResponsiveLayout.getButtonFontSize(16, screenWidth, screenHeight)}px`,
+      color: textColor,
+      fontFamily: 'Cinzel, serif',
+      fontWeight: '600',
+      stroke: '#000000',
+      strokeThickness: 1
+    }).setOrigin(0.5);
     this.sceneElements.push(buttonText);
     
     // Button hover effects
@@ -569,8 +589,8 @@ export class LoginScene extends Scene {
   private createMultiLineActionButton(
     x: number, 
     y: number, 
-    width: number, 
-    height: number, 
+    baseWidth: number, 
+    baseHeight: number, 
     topText: string,
     bottomText: string,
     callback: () => void,
@@ -579,6 +599,11 @@ export class LoginScene extends Scene {
     textColor: string = '#F5F5DC'
   ) {
     const { width: screenWidth, height: screenHeight } = this.scale;
+    const uiScale = ResponsiveLayout.getUIScale(screenWidth, screenHeight);
+    
+    // Scale the button dimensions
+    const width = Math.max(100, baseWidth * uiScale);
+    const height = Math.max(40, baseHeight * uiScale);
     
     const buttonBg = this.add.rectangle(x, y, width, height, bgColor)
       .setStrokeStyle(2, borderColor)
@@ -586,24 +611,26 @@ export class LoginScene extends Scene {
     this.sceneElements.push(buttonBg);
     
     // Top text line
-    const topButtonText = this.add.text(x, y - 10, topText,
-      ResponsiveLayout.getTextStyle(16, screenWidth, screenHeight, {
-        color: textColor,
-        fontFamily: 'Cinzel, serif',
-        fontWeight: '600'
-      })
-    ).setOrigin(0.5);
+    const topButtonText = this.add.text(x, y - 10, topText, {
+      fontSize: `${ResponsiveLayout.getButtonFontSize(16, screenWidth, screenHeight)}px`,
+      color: textColor,
+      fontFamily: 'Cinzel, serif',
+      fontWeight: '600',
+      stroke: '#000000',
+      strokeThickness: 1
+    }).setOrigin(0.5);
     this.sceneElements.push(topButtonText);
     
     // Bottom text line (username)
-    const bottomButtonText = this.add.text(x, y + 12, bottomText,
-      ResponsiveLayout.getTextStyle(14, screenWidth, screenHeight, {
-        color: textColor,
-        fontFamily: 'Cinzel, serif',
-        fontWeight: '400',
-        fontStyle: 'italic'
-      })
-    ).setOrigin(0.5);
+    const bottomButtonText = this.add.text(x, y + 12, bottomText, {
+      fontSize: `${ResponsiveLayout.getButtonFontSize(14, screenWidth, screenHeight)}px`,
+      color: textColor,
+      fontFamily: 'Cinzel, serif',
+      fontWeight: '400',
+      fontStyle: 'italic',
+      stroke: '#000000',
+      strokeThickness: 1
+    }).setOrigin(0.5);
     this.sceneElements.push(bottomButtonText);
     
     // Button hover effects

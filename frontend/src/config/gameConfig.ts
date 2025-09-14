@@ -24,14 +24,15 @@ export const gameConfig: Types.Core.GameConfig = {
   scale: {
     mode: Phaser.Scale.RESIZE,
     autoCenter: Phaser.Scale.CENTER_BOTH,
-    min: {
-      width: 1024,
-      height: 768,
-    },
-    max: {
-      width: 3840,
-      height: 2160,
-    },
+    // Remove min/max constraints to allow true responsive scaling
+    // min: {
+    //   width: 1024,
+    //   height: 768,
+    // },
+    // max: {
+    //   width: 3840,
+    //   height: 2160,
+    // },
     zoom: 1,
     expandParent: false,
     autoRound: true,

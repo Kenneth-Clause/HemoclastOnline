@@ -137,8 +137,9 @@ export class Character extends Phaser.GameObjects.Container {
 
   public startMoving(direction: string): void {
     if (this.directions[direction]) {
-      // Stop any current pathfinding
+      // Stop any current pathfinding or tween movement
       this.stopPathFollowing();
+      this.cancelTweenMovement();
       
       this.currentDirection = this.directions[direction];
       this.isMoving = true;
@@ -170,6 +171,15 @@ export class Character extends Phaser.GameObjects.Container {
     this._isFollowingPath = false;
     this.currentPath = [];
     this.currentPathIndex = 0;
+  }
+
+  public cancelTweenMovement(): void {
+    if (this._isUsingTweenMovement) {
+      // Kill all tweens targeting this character
+      this.scene.tweens.killTweensOf(this);
+      this._isUsingTweenMovement = false;
+      console.log('🛑 Tween movement cancelled');
+    }
   }
 
   public update(): void {
@@ -382,9 +392,10 @@ export class Character extends Phaser.GameObjects.Container {
     
     // For short distances, use smooth tweening instead of pathfinding
     if (distance < 100) {
-      // Stop any current movement
+      // Stop any current movement (WASD, pathfinding, or other tweens)
       this.stopMoving();
       this.stopPathFollowing();
+      this.cancelTweenMovement();
       
       // Calculate direction for animation
       const directionX = Math.sign(dx);

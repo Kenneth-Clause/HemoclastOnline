@@ -5,6 +5,7 @@
 import { Scene } from 'phaser';
 import { GameStore } from '../stores/gameStore';
 import { GraphicsUtils } from '../utils/GraphicsUtils';
+import { ResponsiveLayout } from '../utils/ResponsiveLayout';
 
 export class CharacterSelectionScene extends Scene {
   private gameStore: GameStore;
@@ -116,42 +117,46 @@ export class CharacterSelectionScene extends Scene {
     // Only show warning for actual guest accounts (not registered users)
     if (isGuest && !isRegistered) {
       const { width, height } = this.scale;
-      const baseFontSize = Math.min(width, height) / 100;
       
-      // Warning panel - repositioned to accommodate new header
+      // Use responsive text scaling for warning banner
+      const warningTitleFontSize = ResponsiveLayout.getScaledFontSize(18, width, height);
+      const warningTextFontSize = ResponsiveLayout.getScaledFontSize(14, width, height);
+      const buttonFontSize = ResponsiveLayout.getButtonFontSize(14, width, height);
+      
+      // Warning panel - make it taller to accommodate button below
       GraphicsUtils.createUIPanel(
         this,
         width / 2 - 300,
         height * 0.26,
         600,
-        60,
+        100, // Increased height for button
         0x4a0000,
         0xDC143C,
         2
       );
       
       // Warning text
-      this.add.text(width / 2, height * 0.28, '⚠️ Guest Account Warning', {
-        fontSize: `${baseFontSize * 1.2}px`,
+      this.add.text(width / 2, height * 0.275, '⚠️ Guest Account Warning', {
+        fontSize: `${warningTitleFontSize}px`,
         color: '#FFD700',
         fontFamily: 'Cinzel, serif'
       }).setOrigin(0.5);
       
-      this.add.text(width / 2, height * 0.30, 'Your progress is stored locally. Create an account to secure your data!', {
-        fontSize: `${baseFontSize}px`,
+      this.add.text(width / 2, height * 0.295, 'Your progress is stored locally. Create an account to secure your data!', {
+        fontSize: `${warningTextFontSize}px`,
         color: '#F5F5DC',
         fontFamily: 'Cinzel, serif'
       }).setOrigin(0.5);
       
-      // Create account button - proper button instead of text link
+      // Create account button - moved under the warning banner, centered
       GraphicsUtils.createRuneScapeButton(
         this,
-        width - 120,
-        height * 0.30,
+        width / 2,
+        height * 0.32,
         180,
-        40,
+        35,
         'Create Account',
-        baseFontSize * 0.9,
+        buttonFontSize,
         () => this.upgradeGuestAccount()
       );
     }
@@ -221,7 +226,10 @@ export class CharacterSelectionScene extends Scene {
   }
 
   private createCharacterSlot(x: number, y: number, width: number, height: number, character: any, slotIndex: number) {
-    const baseFontSize = Math.min(this.scale.width, this.scale.height) / 80;
+    // Use responsive text scaling for character slot text
+    const { width: screenWidth, height: screenHeight } = this.scale;
+    const textFontSize = ResponsiveLayout.getScaledFontSize(16, screenWidth, screenHeight);
+    const buttonFontSize = ResponsiveLayout.getButtonFontSize(14, screenWidth, screenHeight);
     
     // Check if this character is selected
     const selectedCharacterId = localStorage.getItem('hemoclast_character_id');
@@ -273,38 +281,38 @@ export class CharacterSelectionScene extends Scene {
     
     if (character) {
       // Existing character
-      this.displayExistingCharacter(x, y, character, baseFontSize);
+      this.displayExistingCharacter(x, y, character, textFontSize, buttonFontSize);
     } else {
       // Empty slot - create new character
-      this.displayEmptySlot(x, y, slotIndex, baseFontSize);
+      this.displayEmptySlot(x, y, slotIndex, textFontSize, buttonFontSize);
     }
   }
 
-  private displayExistingCharacter(x: number, y: number, character: any, fontSize: number) {
+  private displayExistingCharacter(x: number, y: number, character: any, fontSize: number, buttonFontSize: number) {
     // Character portrait placeholder
     const portrait = this.add.circle(x, y - 80, 50, this.getClassColor(character.character_class));
     portrait.setStrokeStyle(3, 0x8B0000);
     
-    // Class icon
+    // Class icon - scale with text but allow larger
     this.add.text(x, y - 80, this.getClassIcon(character.character_class), {
-      fontSize: `${fontSize * 2}px`
+      fontSize: `${Math.max(20, fontSize * 1.5)}px`
     }).setOrigin(0.5);
     
-    // Character name
+    // Character name - use responsive text scaling
     this.add.text(x, y - 10, character.name, {
-      fontSize: `${fontSize * 1.2}px`,
+      fontSize: `${fontSize}px`,
       color: '#F5F5DC',
       fontFamily: 'Cinzel, serif'
     }).setOrigin(0.5);
     
-    // Character class and level
+    // Character class and level - slightly smaller
     this.add.text(x, y + 15, `${character.character_class} • Level ${character.level}`, {
-      fontSize: `${fontSize}px`,
+      fontSize: `${Math.max(10, fontSize * 0.8)}px`,
       color: '#C0C0C0',
       fontFamily: 'Cinzel, serif'
     }).setOrigin(0.5);
     
-    // Select button (changed from Play)
+    // Select button - use button font scaling
     GraphicsUtils.createRuneScapeButton(
       this,
       x,
@@ -312,14 +320,14 @@ export class CharacterSelectionScene extends Scene {
       120,
       35,
       'Select',
-      fontSize,
+      buttonFontSize,
       () => this.selectCharacter(character)
     );
     
     // Enhanced Delete button with better visual feedback
     const deleteButton = this.add.graphics();
     const deleteText = this.add.text(x, y + 120, 'Delete', {
-      fontSize: `${fontSize * 0.8}px`,
+      fontSize: `${Math.max(8, buttonFontSize * 0.8)}px`,
       color: '#FFD700',
       fontFamily: 'Cinzel, serif',
       stroke: '#000000',
@@ -375,14 +383,14 @@ export class CharacterSelectionScene extends Scene {
     });
   }
 
-  private displayEmptySlot(x: number, y: number, _slotIndex: number, fontSize: number) {
-    // Empty slot icon
+  private displayEmptySlot(x: number, y: number, _slotIndex: number, fontSize: number, buttonFontSize: number) {
+    // Empty slot icon - scale with text but ensure minimum visibility
     this.add.text(x, y - 50, '➕', {
-      fontSize: `${fontSize * 3}px`,
+      fontSize: `${Math.max(24, fontSize * 1.8)}px`,
       color: '#666666'
     }).setOrigin(0.5);
     
-    // Create character text
+    // Create character text - use responsive text scaling
     this.add.text(x, y, 'Create New\nCharacter', {
       fontSize: `${fontSize}px`,
       color: '#C0C0C0',
@@ -390,7 +398,7 @@ export class CharacterSelectionScene extends Scene {
       align: 'center'
     }).setOrigin(0.5);
     
-    // Create button
+    // Create button - use button font scaling
     GraphicsUtils.createRuneScapeButton(
       this,
       x,
@@ -398,14 +406,13 @@ export class CharacterSelectionScene extends Scene {
       120,
       35,
       'Create',
-      fontSize,
+      buttonFontSize,
       () => this.createNewCharacter()
     );
   }
 
   private createEnterWorldButton() {
     const { width, height } = this.scale;
-    const baseFontSize = Math.min(width, height) / 80;
     
     // Check if a character is selected
     const selectedCharacterId = localStorage.getItem('hemoclast_character_id');
@@ -417,7 +424,8 @@ export class CharacterSelectionScene extends Scene {
     const showGuestWarning = isGuest && !isRegistered;
     const buttonY = showGuestWarning ? height * 0.85 : height * 0.80;
     
-    // Create Enter World button
+    // Create Enter World button with responsive button font scaling
+    const buttonFontSize = ResponsiveLayout.getButtonFontSize(18, width, height);
     const enterWorldButton = GraphicsUtils.createRuneScapeButton(
       this,
       width / 2,
@@ -425,7 +433,7 @@ export class CharacterSelectionScene extends Scene {
       180,
       50,
       'Enter World',
-      baseFontSize * 1.2,
+      buttonFontSize,
       () => this.enterWorld()
     );
     
@@ -439,10 +447,12 @@ export class CharacterSelectionScene extends Scene {
   
   private createBottomLeftButtons() {
     const { width, height } = this.scale;
-    const baseFontSize = Math.min(width, height) / 80;
     const buttonX = 100;
     const buttonSpacing = 45;
     const bottomMargin = 30;
+    
+    // Use responsive button font scaling
+    const buttonFontSize = ResponsiveLayout.getButtonFontSize(14, width, height);
     
     // Stack buttons vertically with logout at the bottom
     const logoutY = height - bottomMargin;
@@ -457,7 +467,7 @@ export class CharacterSelectionScene extends Scene {
       100,
       35,
       'Credits',
-      baseFontSize * 0.9,
+      buttonFontSize,
       () => this.goToCredits()
     );
     
@@ -469,7 +479,7 @@ export class CharacterSelectionScene extends Scene {
       100,
       35,
       'Settings',
-      baseFontSize * 0.9,
+      buttonFontSize,
       () => this.goToSettings()
     );
     
@@ -481,7 +491,7 @@ export class CharacterSelectionScene extends Scene {
       120,
       35,
       '← Logout',
-      baseFontSize * 0.9,
+      buttonFontSize,
       () => this.logout()
     );
   }
@@ -659,12 +669,11 @@ export class CharacterSelectionScene extends Scene {
       existingInput.remove();
     }
     
-    // Calculate responsive sizing for input with more aggressive scaling
-    const scale = Math.min(width / 1920, height / 1080);
-    const scaleFactor = Math.pow(scale, 0.7); // More aggressive scaling for small screens
-    const inputWidth = Math.max(160, 280 * scaleFactor); // Reduced minimum width
-    const fontSize = Math.max(12, 18 * scaleFactor); // Reduced minimum font size
-    const padding = Math.max(8, 15 * scaleFactor); // Reduced minimum padding
+    // Use the same responsive system as other scenes for consistency
+    const uiScale = ResponsiveLayout.getUIScale(width, height);
+    const inputWidth = Math.max(200, 280 * uiScale); // Reasonable minimum for usability
+    const fontSize = Math.max(12, 18 * uiScale); // Minimum for text legibility
+    const padding = Math.max(8, 15 * uiScale); // Adequate padding for usability
     
     // Create confirmation input positioned below the instruction text
     const confirmInput = document.createElement('input');

@@ -741,7 +741,7 @@ body::before {
   
   .gothic-input {
     /* All sizing is now handled by JavaScript using ResponsiveLayout system */
-    font-size: 16px !important; /* Prevent zoom on iOS - will be overridden by JS */
+    /* Removed fixed font-size - let JavaScript handle all scaling */
   }
 }
 
