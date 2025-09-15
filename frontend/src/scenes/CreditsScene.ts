@@ -5,12 +5,11 @@
 import { Scene } from 'phaser';
 import { GothicTitleUtils } from '../utils/GothicTitleUtils';
 import { GameStore } from '../stores/gameStore';
+import { ResponsiveLayout } from '../utils/ResponsiveLayout';
 
 export class CreditsScene extends Scene {
   private sceneElements: Phaser.GameObjects.GameObject[] = [];
   private gameStore: GameStore;
-  private scrollY: number = 0;
-  private scrollSpeed: number = 30;
   private creditsContainer: Phaser.GameObjects.Container | null = null;
 
   constructor() {
@@ -82,17 +81,42 @@ export class CreditsScene extends Scene {
     // Create scrolling credits
     this.createScrollingCredits();
     
-    // Back button
+    // Mobile detection for responsive buttons
+    const isMobile = ResponsiveLayout.isMobile(width, height);
+    const mobileAdjustments = ResponsiveLayout.getMobileAdjustments(width, height);
+    const isActualMobileDevice = ResponsiveLayout.isMobileDevice();
+    const isMobileLayout = (isActualMobileDevice || width < 400) && isMobile && mobileAdjustments.isPortrait;
+    const uiScale = ResponsiveLayout.getUIScale(width, height);
+    
+    // Mobile-friendly button dimensions and positioning
+    let buttonWidth, buttonHeight, buttonFontSize, buttonY, backButtonX, skipButtonX;
+    if (isMobileLayout) {
+      buttonWidth = Math.max(100, 120 * uiScale);
+      buttonHeight = Math.max(30, 35 * uiScale);
+      buttonFontSize = Math.max(12, 13 * uiScale);
+      buttonY = height - Math.max(30, 35 * uiScale);
+      backButtonX = Math.max(60, buttonWidth / 2 + 10);
+      skipButtonX = width - Math.max(60, buttonWidth / 2 + 10);
+    } else {
+      buttonWidth = 150;
+      buttonHeight = 40;
+      buttonFontSize = 14;
+      buttonY = height - 50;
+      backButtonX = 100;
+      skipButtonX = width - 100;
+    }
+    
+    // Back button - mobile-friendly
     const backButton = GothicTitleUtils.createEnhancedGothicButton(
       this,
-      100,
-      height - 50,
-      150,
-      40,
+      backButtonX,
+      buttonY,
+      buttonWidth,
+      buttonHeight,
       '← Back',
       () => this.goBack(),
       {
-        fontSize: 14,
+        fontSize: buttonFontSize,
         bgColor: 0x2d1b1b,
         borderColor: 0x8B0000,
         textColor: '#F5F5DC',
@@ -107,17 +131,18 @@ export class CreditsScene extends Scene {
     this.sceneElements.push(backButton.text);
     this.sceneElements.push(backButton.hitArea);
     
-    // Skip button
+    // Skip button - mobile-friendly
+    const skipButtonWidth = isMobileLayout ? Math.max(80, 100 * uiScale) : 120;
     const skipButton = GothicTitleUtils.createEnhancedGothicButton(
       this,
-      width - 100,
-      height - 50,
-      120,
-      40,
+      skipButtonX,
+      buttonY,
+      skipButtonWidth,
+      buttonHeight,
       'Skip →',
       () => this.goBack(),
       {
-        fontSize: 14,
+        fontSize: buttonFontSize,
         bgColor: 0x2d1b1b,
         borderColor: 0x666666,
         textColor: '#C0C0C0',
@@ -135,6 +160,13 @@ export class CreditsScene extends Scene {
 
   private createScrollingCredits() {
     const { width, height } = this.scale;
+    
+    // Mobile detection for responsive text
+    const isMobile = ResponsiveLayout.isMobile(width, height);
+    const mobileAdjustments = ResponsiveLayout.getMobileAdjustments(width, height);
+    const isActualMobileDevice = ResponsiveLayout.isMobileDevice();
+    const isMobileLayout = (isActualMobileDevice || width < 400) && isMobile && mobileAdjustments.isPortrait;
+    const uiScale = ResponsiveLayout.getUIScale(width, height);
     
     // Create container for scrolling credits
     this.creditsContainer = this.add.container(width / 2, height);
@@ -225,55 +257,55 @@ export class CreditsScene extends Scene {
         case 'title':
           textStyle = {
             ...textStyle,
-            fontSize: '32px',
+            fontSize: isMobileLayout ? `${Math.max(24, 28 * uiScale)}px` : '32px',
             color: '#8B0000',
             fontWeight: '700',
             fontFamily: 'Nosifer, serif',
-            strokeThickness: 2
+            strokeThickness: isMobileLayout ? 1 : 2
           };
-          currentY += 20;
+          currentY += isMobileLayout ? 15 : 20;
           break;
           
         case 'subtitle':
           textStyle = {
             ...textStyle,
-            fontSize: '18px',
+            fontSize: isMobileLayout ? `${Math.max(14, 16 * uiScale)}px` : '18px',
             color: '#FFD700',
             fontStyle: 'italic',
             fontWeight: '600'
           };
-          currentY += 15;
+          currentY += isMobileLayout ? 12 : 15;
           break;
           
         case 'section':
           textStyle = {
             ...textStyle,
-            fontSize: '24px',
+            fontSize: isMobileLayout ? `${Math.max(18, 20 * uiScale)}px` : '24px',
             color: '#DC143C',
             fontWeight: '700',
-            strokeThickness: 2
+            strokeThickness: isMobileLayout ? 1 : 2
           };
-          currentY += 25;
+          currentY += isMobileLayout ? 20 : 25;
           break;
           
         case 'credit':
           textStyle = {
             ...textStyle,
-            fontSize: '16px',
+            fontSize: isMobileLayout ? `${Math.max(13, 14 * uiScale)}px` : '16px',
             color: '#F5F5DC',
             fontWeight: '600'
           };
-          currentY += 10;
+          currentY += isMobileLayout ? 8 : 10;
           break;
           
         case 'name':
           textStyle = {
             ...textStyle,
-            fontSize: '14px',
+            fontSize: isMobileLayout ? `${Math.max(11, 12 * uiScale)}px` : '14px',
             color: '#C0C0C0',
             fontStyle: 'italic'
           };
-          currentY += 5;
+          currentY += isMobileLayout ? 4 : 5;
           break;
       }
       

@@ -5,6 +5,7 @@
 import { Scene } from 'phaser';
 import { GothicTitleUtils } from '../utils/GothicTitleUtils';
 import { GameStore } from '../stores/gameStore';
+import { ResponsiveLayout } from '../utils/ResponsiveLayout';
 
 export class SettingsScene extends Scene {
   private sceneElements: Phaser.GameObjects.GameObject[] = [];
@@ -119,23 +120,44 @@ export class SettingsScene extends Scene {
 
   private createAudioSettings() {
     const { width, height } = this.scale;
-    const startY = height * 0.35;
-    const panelWidth = width / 2 - 100;
+    
+    // Mobile detection
+    const isMobile = ResponsiveLayout.isMobile(width, height);
+    const mobileAdjustments = ResponsiveLayout.getMobileAdjustments(width, height);
+    const isActualMobileDevice = ResponsiveLayout.isMobileDevice();
+    const isMobileLayout = (isActualMobileDevice || width < 400) && isMobile && mobileAdjustments.isPortrait;
+    const uiScale = ResponsiveLayout.getUIScale(width, height);
+    
+    // Responsive panel dimensions and positioning
+    let startY, panelWidth, panelX, panelHeight;
+    if (isMobileLayout) {
+      startY = height * 0.32;
+      panelWidth = Math.min(320, width * 0.9);
+      panelX = (width - panelWidth) / 2;
+      panelHeight = 240; // Taller for mobile to accommodate content
+    } else {
+      startY = height * 0.35;
+      panelWidth = width / 2 - 100;
+      panelX = 50;
+      panelHeight = 220;
+    }
     
     // Audio Settings Panel
     const audioPanel = this.add.graphics();
     audioPanel.fillStyle(0x1a1a1a, 0.8);
-    audioPanel.fillRoundedRect(50, startY - 20, panelWidth, 220, 8);
+    audioPanel.fillRoundedRect(panelX, startY - 20, panelWidth, panelHeight, 8);
     audioPanel.lineStyle(2, 0x8B0000);
-    audioPanel.strokeRoundedRect(50, startY - 20, panelWidth, 220, 8);
+    audioPanel.strokeRoundedRect(panelX, startY - 20, panelWidth, panelHeight, 8);
     this.sceneElements.push(audioPanel);
     
-    // Audio Title
-    const audioTitle = this.add.text(50 + panelWidth / 2, startY, 'Audio Settings', {
-      fontSize: '20px',
+    // Audio Title - responsive sizing
+    const titleFontSize = isMobileLayout ? 
+      Math.max(16, 18 * uiScale) : 
+      ResponsiveLayout.getScaledFontSize(20, width, height);
+    const audioTitle = this.add.text(panelX + panelWidth / 2, startY, 'Audio Settings', {
+      fontSize: `${titleFontSize}px`,
       color: '#FFD700',
       fontFamily: 'Cinzel, serif',
-      fontWeight: '600',
       stroke: '#000000',
       strokeThickness: 1
     }).setOrigin(0.5);
@@ -149,46 +171,62 @@ export class SettingsScene extends Scene {
       { name: 'Ambient Volume', key: 'ambientVolume' }
     ];
     
+    // Mobile-friendly spacing and sizing
+    const itemSpacing = isMobileLayout ? 30 : 35;
+    const labelFontSize = isMobileLayout ? 
+      Math.max(12, 13 * uiScale) : 
+      ResponsiveLayout.getScaledFontSize(14, width, height);
+    const buttonFontSize = isMobileLayout ? 
+      Math.max(16, 18 * uiScale) : 
+      ResponsiveLayout.getScaledFontSize(20, width, height);
+    
     volumeSettings.forEach((setting, index) => {
-      const y = startY + 40 + (index * 35); // Increased spacing between items
+      const y = startY + 40 + (index * itemSpacing);
       
-      // Setting label
-      const label = this.add.text(70, y, setting.name, {
-        fontSize: '14px',
+      // Setting label - responsive positioning
+      const labelX = panelX + (isMobileLayout ? 15 : 20);
+      const label = this.add.text(labelX, y, setting.name, {
+        fontSize: `${labelFontSize}px`,
         color: '#F5F5DC',
         fontFamily: 'Cinzel, serif'
       });
       this.sceneElements.push(label);
       
-      // Control area positioning
-      const controlAreaX = 50 + panelWidth - 120; // Right side of panel
+      // Control area positioning - mobile-friendly
+      const controlAreaX = isMobileLayout ? 
+        panelX + panelWidth - 80 : 
+        panelX + panelWidth - 120;
+      
+      // Mobile-friendly button spacing and sizing
+      const buttonSpacing = isMobileLayout ? 25 : 30;
+      const buttonPadding = isMobileLayout ? { x: 6, y: 3 } : { x: 8, y: 4 };
+      const volumeFontSize = isMobileLayout ? 
+        Math.max(12, 13 * uiScale) : 
+        ResponsiveLayout.getScaledFontSize(14, width, height);
       
       // Decrease button
-      const decreaseBtn = this.add.text(controlAreaX - 30, y, '−', {
-        fontSize: '20px',
+      const decreaseBtn = this.add.text(controlAreaX - buttonSpacing, y, '−', {
+        fontSize: `${buttonFontSize}px`,
         color: '#DC143C',
         fontFamily: 'Cinzel, serif',
-        fontWeight: '700',
         backgroundColor: '#2d1b1b',
-        padding: { x: 8, y: 4 }
+        padding: buttonPadding
       }).setOrigin(0.5).setInteractive({ useHandCursor: true });
       
       // Volume display
       const volumeText = this.add.text(controlAreaX, y, `${Math.round(this.settings[setting.key] * 100)}%`, {
-        fontSize: '14px',
+        fontSize: `${volumeFontSize}px`,
         color: '#FFD700',
-        fontFamily: 'Cinzel, serif',
-        fontWeight: '600'
+        fontFamily: 'Cinzel, serif'
       }).setOrigin(0.5);
       
       // Increase button
-      const increaseBtn = this.add.text(controlAreaX + 30, y, '+', {
-        fontSize: '20px',
+      const increaseBtn = this.add.text(controlAreaX + buttonSpacing, y, '+', {
+        fontSize: `${buttonFontSize}px`,
         color: '#228B22',
         fontFamily: 'Cinzel, serif',
-        fontWeight: '700',
         backgroundColor: '#2d1b1b',
-        padding: { x: 8, y: 4 }
+        padding: buttonPadding
       }).setOrigin(0.5).setInteractive({ useHandCursor: true });
       
       this.sceneElements.push(decreaseBtn, volumeText, increaseBtn);
@@ -227,24 +265,44 @@ export class SettingsScene extends Scene {
 
   private createGraphicsSettings() {
     const { width, height } = this.scale;
-    const startY = height * 0.35;
-    const panelWidth = width / 2 - 100;
-    const panelX = width / 2 + 50;
+    
+    // Mobile detection
+    const isMobile = ResponsiveLayout.isMobile(width, height);
+    const mobileAdjustments = ResponsiveLayout.getMobileAdjustments(width, height);
+    const isActualMobileDevice = ResponsiveLayout.isMobileDevice();
+    const isMobileLayout = (isActualMobileDevice || width < 400) && isMobile && mobileAdjustments.isPortrait;
+    const uiScale = ResponsiveLayout.getUIScale(width, height);
+    
+    // Responsive panel dimensions and positioning
+    let startY, panelWidth, panelX, panelHeight;
+    if (isMobileLayout) {
+      startY = height * 0.58; // Position below audio panel
+      panelWidth = Math.min(320, width * 0.9);
+      panelX = (width - panelWidth) / 2;
+      panelHeight = 200;
+    } else {
+      startY = height * 0.35;
+      panelWidth = width / 2 - 100;
+      panelX = width / 2 + 50;
+      panelHeight = 220;
+    }
     
     // Graphics Settings Panel
     const graphicsPanel = this.add.graphics();
     graphicsPanel.fillStyle(0x1a1a1a, 0.8);
-    graphicsPanel.fillRoundedRect(panelX, startY - 20, panelWidth, 220, 8);
+    graphicsPanel.fillRoundedRect(panelX, startY - 20, panelWidth, panelHeight, 8);
     graphicsPanel.lineStyle(2, 0x8B0000);
-    graphicsPanel.strokeRoundedRect(panelX, startY - 20, panelWidth, 220, 8);
+    graphicsPanel.strokeRoundedRect(panelX, startY - 20, panelWidth, panelHeight, 8);
     this.sceneElements.push(graphicsPanel);
     
-    // Graphics Title
+    // Graphics Title - responsive sizing
+    const titleFontSize = isMobileLayout ? 
+      Math.max(16, 18 * uiScale) : 
+      ResponsiveLayout.getScaledFontSize(20, width, height);
     const graphicsTitle = this.add.text(panelX + panelWidth / 2, startY, 'Graphics Settings', {
-      fontSize: '20px',
+      fontSize: `${titleFontSize}px`,
       color: '#FFD700',
       fontFamily: 'Cinzel, serif',
-      fontWeight: '600',
       stroke: '#000000',
       strokeThickness: 1
     }).setOrigin(0.5);
@@ -258,25 +316,38 @@ export class SettingsScene extends Scene {
       { name: 'Animations', key: 'animations' }
     ];
     
+    // Mobile-friendly spacing and sizing
+    const itemSpacing = isMobileLayout ? 30 : 35;
+    const labelFontSize = isMobileLayout ? 
+      Math.max(12, 13 * uiScale) : 
+      ResponsiveLayout.getScaledFontSize(14, width, height);
+    const toggleFontSize = isMobileLayout ? 
+      Math.max(12, 13 * uiScale) : 
+      ResponsiveLayout.getScaledFontSize(14, width, height);
+    
     graphicsSettings.forEach((setting, index) => {
-      const y = startY + 40 + (index * 35); // Increased spacing to match audio panel
+      const y = startY + 40 + (index * itemSpacing);
       
-      // Setting label
-      const label = this.add.text(panelX + 20, y, setting.name, {
-        fontSize: '14px',
+      // Setting label - responsive positioning
+      const labelX = panelX + (isMobileLayout ? 15 : 20);
+      const label = this.add.text(labelX, y, setting.name, {
+        fontSize: `${labelFontSize}px`,
         color: '#F5F5DC',
         fontFamily: 'Cinzel, serif'
       });
       this.sceneElements.push(label);
       
-      // Toggle button positioned on the right side of the panel
-      const toggleBtn = this.add.text(panelX + panelWidth - 60, y, this.settings[setting.key] ? 'ON' : 'OFF', {
-        fontSize: '14px',
+      // Toggle button - mobile-friendly positioning and sizing
+      const toggleX = isMobileLayout ? 
+        panelX + panelWidth - 40 : 
+        panelX + panelWidth - 60;
+      const togglePadding = isMobileLayout ? { x: 10, y: 5 } : { x: 12, y: 6 };
+      const toggleBtn = this.add.text(toggleX, y, this.settings[setting.key] ? 'ON' : 'OFF', {
+        fontSize: `${toggleFontSize}px`,
         color: this.settings[setting.key] ? '#228B22' : '#DC143C',
         fontFamily: 'Cinzel, serif',
-        fontWeight: '600',
         backgroundColor: this.settings[setting.key] ? '#004400' : '#440000',
-        padding: { x: 12, y: 6 }
+        padding: togglePadding
       }).setOrigin(0.5).setInteractive({ useHandCursor: true });
       
       this.sceneElements.push(toggleBtn);
@@ -322,7 +393,6 @@ export class SettingsScene extends Scene {
       fontSize: '20px',
       color: '#FFD700',
       fontFamily: 'Cinzel, serif',
-      fontWeight: '600',
       stroke: '#000000',
       strokeThickness: 1
     }).setOrigin(0.5);
