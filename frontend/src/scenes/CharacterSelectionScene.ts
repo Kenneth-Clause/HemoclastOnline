@@ -842,37 +842,39 @@ export class CharacterSelectionScene extends Scene {
     const { width, height } = this.scale;
     const uiScale = ResponsiveLayout.getUIScale(width, height);
     
-    // Check if a character is selected
-    const selectedCharacterId = localStorage.getItem('hemoclast_character_id');
-    const isCharacterSelected = selectedCharacterId && this.characters.some(char => char && char.id.toString() === selectedCharacterId);
-    
-    // Position Enter World button just above the character cards
-    const isGuest = localStorage.getItem('hemoclast_is_guest');
-    const isRegistered = localStorage.getItem('hemoclast_is_registered');
-    const showGuestWarning = isGuest && !isRegistered;
-    
-    // Calculate where cards will be positioned and place button above them
-    let buttonY;
-    if (showGuestWarning) {
-      buttonY = height * 0.42; // Above cards when guest warning is shown
-    } else {
-      buttonY = height * 0.38; // Above cards when no guest warning
-    }
-    
-    // Responsive button dimensions for different screen sizes
-    const buttonFontSize = ResponsiveLayout.getButtonFontSize(16, width, height);
-    let enterButtonWidth, enterButtonHeight;
-    
-    // Check screen type for appropriate sizing
+    // Check screen type for mobile detection
     const isMobile = ResponsiveLayout.isMobile(width, height);
     const mobileAdjustments = ResponsiveLayout.getMobileAdjustments(width, height);
     const isActualMobileDevice = ResponsiveLayout.isMobileDevice();
     const isMobileLayout = (isActualMobileDevice || width < 400) && isMobile && mobileAdjustments.isPortrait;
     
+    // Hide Enter World button completely on mobile screens
     if (isMobileLayout) {
-      enterButtonWidth = Math.max(120, 150 * uiScale);
-      enterButtonHeight = Math.max(24, buttonFontSize + 8);
-    } else if (width < 1024) {
+      return;
+    }
+    
+    // Check if a character is selected
+    const selectedCharacterId = localStorage.getItem('hemoclast_character_id');
+    const isCharacterSelected = selectedCharacterId && this.characters.some(char => char && char.id.toString() === selectedCharacterId);
+    
+    // Position Enter World button below the character cards for non-mobile screens
+    const isGuest = localStorage.getItem('hemoclast_is_guest');
+    const isRegistered = localStorage.getItem('hemoclast_is_registered');
+    const showGuestWarning = isGuest && !isRegistered;
+    
+    // Calculate where cards are positioned and place button below them
+    let buttonY;
+    if (showGuestWarning) {
+      buttonY = height * 0.78; // Below cards when guest warning is shown
+    } else {
+      buttonY = height * 0.75; // Below cards when no guest warning
+    }
+    
+    // Responsive button dimensions for different screen sizes (non-mobile only)
+    const buttonFontSize = ResponsiveLayout.getButtonFontSize(16, width, height);
+    let enterButtonWidth, enterButtonHeight;
+    
+    if (width < 1024) {
       // Tablet
       enterButtonWidth = Math.max(160, 200 * uiScale);
       enterButtonHeight = Math.max(32, buttonFontSize + 12);
@@ -914,66 +916,114 @@ export class CharacterSelectionScene extends Scene {
     const buttonFontSize = ResponsiveLayout.getButtonFontSize(14, width, height);
     const uiScale = ResponsiveLayout.getUIScale(width, height);
     
-    // Mobile-specific smaller sizing, desktop keeps original size
-    let buttonWidth, buttonHeight, buttonX, buttonSpacing, bottomMargin;
-    
     if (isMobileLayout) {
-      // Mobile: smaller buttons, moved further inward
-      buttonWidth = Math.max(60, 70 * uiScale);  // Even smaller width for mobile
-      buttonHeight = Math.max(20, buttonFontSize + 4); // Smaller height for mobile
-      buttonX = Math.max(35, 45 * uiScale);      // Moved even further inward for mobile
-      buttonSpacing = Math.max(25, 28 * uiScale); // Tighter spacing for mobile
-      bottomMargin = Math.max(15, 20 * uiScale);  // Less bottom margin for mobile
+      // Mobile: Keep original vertical layout in bottom left
+      const buttonWidth = Math.max(60, 70 * uiScale);
+      const buttonHeight = Math.max(20, buttonFontSize + 4);
+      const buttonX = Math.max(35, 45 * uiScale);
+      const buttonSpacing = Math.max(25, 28 * uiScale);
+      const bottomMargin = Math.max(15, 20 * uiScale);
+      
+      // Stack buttons vertically with logout at the bottom
+      const logoutY = height - bottomMargin;
+      const settingsY = logoutY - buttonSpacing;
+      const creditsY = settingsY - buttonSpacing;
+      
+      // Credits button (top)
+      GraphicsUtils.createRuneScapeButton(
+        this,
+        buttonX,
+        creditsY,
+        buttonWidth,
+        buttonHeight,
+        'Credits',
+        buttonFontSize,
+        () => this.goToCredits()
+      );
+      
+      // Settings button (middle)
+      GraphicsUtils.createRuneScapeButton(
+        this,
+        buttonX,
+        settingsY,
+        buttonWidth,
+        buttonHeight,
+        'Settings',
+        buttonFontSize,
+        () => this.goToSettings()
+      );
+      
+      // Logout button (bottom) - slightly wider for arrow
+      GraphicsUtils.createRuneScapeButton(
+        this,
+        buttonX,
+        logoutY,
+        Math.max(buttonWidth, 75 * uiScale),
+        buttonHeight,
+        '← Logout',
+        buttonFontSize,
+        () => this.logout()
+      );
     } else {
-      // Desktop: scale properly and ensure they don't fall off screen
-      buttonWidth = Math.max(80, 120 * uiScale);
-      buttonHeight = Math.max(30, 40 * uiScale);
-      // Ensure buttons stay on screen - use percentage of screen width with minimum distance
-      buttonX = Math.max(30, Math.min(50 * uiScale, width * 0.05));
-      buttonSpacing = Math.max(35, 45 * uiScale);
-      bottomMargin = Math.max(25, 35 * uiScale);
+      // Non-mobile: Position buttons horizontally on the red separator line
+      const separatorY = height * 0.16; // Same Y position as the red line
+      
+      // Responsive button dimensions for non-mobile
+      const buttonWidth = Math.max(80, 100 * uiScale);
+      const buttonHeight = Math.max(24, 28 * uiScale);
+      const horizontalSpacing = Math.max(120, 140 * uiScale);
+      
+      // Center the three buttons horizontally
+      const centerX = width / 2;
+      const settingsX = centerX - horizontalSpacing;
+      const creditsX = centerX;
+      const logoutX = centerX + horizontalSpacing;
+      
+      // Create buttons with higher depth to appear above the red line
+      const buttonDepth = 10; // Higher than the default depth of the separator line
+      
+      // Settings button (left)
+      const settingsButton = GraphicsUtils.createRuneScapeButton(
+        this,
+        settingsX,
+        separatorY,
+        buttonWidth,
+        buttonHeight,
+        'Settings',
+        buttonFontSize,
+        () => this.goToSettings()
+      );
+      settingsButton.background.setDepth(buttonDepth);
+      settingsButton.text.setDepth(buttonDepth + 1);
+      
+      // Credits button (center)
+      const creditsButton = GraphicsUtils.createRuneScapeButton(
+        this,
+        creditsX,
+        separatorY,
+        buttonWidth,
+        buttonHeight,
+        'Credits',
+        buttonFontSize,
+        () => this.goToCredits()
+      );
+      creditsButton.background.setDepth(buttonDepth);
+      creditsButton.text.setDepth(buttonDepth + 1);
+      
+      // Logout button (right) - slightly wider for arrow
+      const logoutButton = GraphicsUtils.createRuneScapeButton(
+        this,
+        logoutX,
+        separatorY,
+        Math.max(buttonWidth, 110 * uiScale),
+        buttonHeight,
+        '← Logout',
+        buttonFontSize,
+        () => this.logout()
+      );
+      logoutButton.background.setDepth(buttonDepth);
+      logoutButton.text.setDepth(buttonDepth + 1);
     }
-    
-    // Stack buttons vertically with logout at the bottom
-    const logoutY = height - bottomMargin;
-    const settingsY = logoutY - buttonSpacing;
-    const creditsY = settingsY - buttonSpacing;
-    
-    // Credits button (top)
-    GraphicsUtils.createRuneScapeButton(
-      this,
-      buttonX,
-      creditsY,
-      buttonWidth,
-      buttonHeight,
-      'Credits',
-      buttonFontSize,
-      () => this.goToCredits()
-    );
-    
-    // Settings button (middle)
-    GraphicsUtils.createRuneScapeButton(
-      this,
-      buttonX,
-      settingsY,
-      buttonWidth,
-      buttonHeight,
-      'Settings',
-      buttonFontSize,
-      () => this.goToSettings()
-    );
-    
-    // Logout button (bottom) - slightly wider for arrow
-    GraphicsUtils.createRuneScapeButton(
-      this,
-      buttonX,
-      logoutY,
-      isMobileLayout ? Math.max(buttonWidth, 75 * uiScale) : Math.max(buttonWidth, 110 * uiScale),
-      buttonHeight,
-      '← Logout',
-      buttonFontSize,
-      () => this.logout()
-    );
   }
   
   private enterWorld() {
