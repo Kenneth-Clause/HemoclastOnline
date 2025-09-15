@@ -100,11 +100,11 @@ export class CharacterSelectionScene extends Scene {
     // Load player's characters
     await this.loadCharacters();
     
+    // Add Enter World button (just above character cards)
+    this.createEnterWorldButton();
+    
     // Display character slots
     this.displayCharacterSlots();
-    
-    // Add Enter World button (centered below character slots)
-    this.createEnterWorldButton();
     
     // Add bottom left buttons (Logout, Settings, Credits)
     this.createBottomLeftButtons();
@@ -117,49 +117,189 @@ export class CharacterSelectionScene extends Scene {
     // Only show warning for actual guest accounts (not registered users)
     if (isGuest && !isRegistered) {
       const { width, height } = this.scale;
+      const uiScale = ResponsiveLayout.getUIScale(width, height);
+      
+      // Check if mobile layout
+      const isMobile = ResponsiveLayout.isMobile(width, height);
+      const mobileAdjustments = ResponsiveLayout.getMobileAdjustments(width, height);
+      const isActualMobileDevice = ResponsiveLayout.isMobileDevice();
+      const isMobileLayout = (isActualMobileDevice || width < 400) && isMobile && mobileAdjustments.isPortrait;
       
       // Use responsive text scaling for warning banner
-      const warningTitleFontSize = ResponsiveLayout.getScaledFontSize(18, width, height);
-      const warningTextFontSize = ResponsiveLayout.getScaledFontSize(14, width, height);
-      const buttonFontSize = ResponsiveLayout.getButtonFontSize(14, width, height);
+      const buttonFontSize = ResponsiveLayout.getButtonFontSize(isMobileLayout ? 12 : 14, width, height);
       
-      // Warning panel - make it taller to accommodate button below
+      // Responsive info bar scaling - different sizes for different screen types
+      const panelHeight = Math.max(28, 35 * uiScale);
+      let panelWidth;
+      if (isMobileLayout) {
+        panelWidth = Math.min(200, width * 0.7); // Mobile: compact
+      } else if (width < 1024) {
+        panelWidth = Math.min(320, width * 0.5); // Tablet: medium
+      } else {
+        panelWidth = Math.min(400, width * 0.35); // Desktop: larger but proportional
+      }
+      const panelY = height * 0.28; // Moved down from 0.22 to give more space from "Select Your Character"
+      
+      // Create compact panel
       GraphicsUtils.createUIPanel(
         this,
-        width / 2 - 300,
-        height * 0.26,
-        600,
-        100, // Increased height for button
-        0x4a0000,
-        0xDC143C,
-        2
+        width / 2 - panelWidth / 2,
+        panelY,
+        panelWidth,
+        panelHeight,
+        0x2d1b1b,
+        0x8B0000,
+        Math.max(1, 2 * uiScale)
       );
       
-      // Warning text
-      this.add.text(width / 2, height * 0.275, '⚠️ Guest Account Warning', {
-        fontSize: `${warningTitleFontSize}px`,
-        color: '#FFD700',
-        fontFamily: 'Cinzel, serif'
-      }).setOrigin(0.5);
+      // Info icon on the left - clickable for popup
+      const infoIconX = width / 2 - panelWidth / 2 + 20;
+      const infoIconY = panelY + panelHeight / 2;
       
-      this.add.text(width / 2, height * 0.295, 'Your progress is stored locally. Create an account to secure your data!', {
-        fontSize: `${warningTextFontSize}px`,
+      const infoIcon = this.add.text(infoIconX, infoIconY, 'ℹ️', {
+        fontSize: `${Math.max(16, 20 * uiScale)}px`
+      }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      
+      // Make info icon clickable for popup
+      infoIcon.on('pointerdown', () => {
+        this.showGuestInfoPopup();
+      });
+      
+      // Simple "Guest Info" text
+      const infoTextX = infoIconX + 25;
+      this.add.text(infoTextX, infoIconY, 'Guest Info', {
+        fontSize: `${Math.max(10, 12 * uiScale)}px`,
         color: '#F5F5DC',
         fontFamily: 'Cinzel, serif'
-      }).setOrigin(0.5);
+      }).setOrigin(0, 0.5);
       
-      // Create account button - moved under the warning banner, centered
+      // Create Account button on the right - responsive sizing
+      let createButtonWidth, createButtonHeight, createButtonFontSize;
+      if (isMobileLayout) {
+        createButtonWidth = Math.max(80, 100 * uiScale);
+        createButtonHeight = Math.max(20, buttonFontSize + 4);
+        createButtonFontSize = Math.max(8, buttonFontSize - 2);
+      } else if (width < 1024) {
+        // Tablet
+        createButtonWidth = Math.max(120, 140 * uiScale);
+        createButtonHeight = Math.max(28, buttonFontSize + 6);
+        createButtonFontSize = buttonFontSize;
+      } else {
+        // Desktop
+        createButtonWidth = Math.max(140, 160 * uiScale);
+        createButtonHeight = Math.max(32, buttonFontSize + 8);
+        createButtonFontSize = Math.max(buttonFontSize, 14);
+      }
+      
+      const createButtonX = width / 2 + panelWidth / 2 - createButtonWidth / 2 - 10;
+      const createButtonY = infoIconY;
+      
       GraphicsUtils.createRuneScapeButton(
         this,
-        width / 2,
-        height * 0.32,
-        180,
-        35,
+        createButtonX,
+        createButtonY,
+        createButtonWidth,
+        createButtonHeight,
         'Create Account',
-        buttonFontSize,
+        createButtonFontSize,
         () => this.upgradeGuestAccount()
       );
     }
+  }
+  
+  private showGuestInfoPopup() {
+    const { width, height } = this.scale;
+    const uiScale = ResponsiveLayout.getUIScale(width, height);
+    
+    // Check if mobile layout
+    const isMobile = ResponsiveLayout.isMobile(width, height);
+    const mobileAdjustments = ResponsiveLayout.getMobileAdjustments(width, height);
+    const isActualMobileDevice = ResponsiveLayout.isMobileDevice();
+    const isMobileLayout = (isActualMobileDevice || width < 400) && isMobile && mobileAdjustments.isPortrait;
+    
+    // Create modal overlay
+    const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.7);
+    overlay.setDepth(300);
+    
+    // Responsive popup dimensions for different screen sizes
+    let popupWidth, popupHeight;
+    if (isMobileLayout) {
+      popupWidth = Math.min(280, width * 0.85);
+      popupHeight = 140;
+    } else if (width < 1024) {
+      // Tablet
+      popupWidth = Math.min(400, width * 0.7);
+      popupHeight = 180;
+    } else {
+      // Desktop
+      popupWidth = Math.min(500, width * 0.5);
+      popupHeight = 200;
+    }
+    
+    // Create popup panel
+    const panel = GraphicsUtils.createUIPanel(
+      this,
+      width / 2 - popupWidth / 2,
+      height / 2 - popupHeight / 2,
+      popupWidth,
+      popupHeight,
+      0x2d1b1b,
+      0x8B0000,
+      Math.max(2, 3 * uiScale)
+    );
+    panel.setDepth(301);
+    
+    // Title
+    const titleY = height / 2 - popupHeight / 2 + 30;
+    const title = this.add.text(width / 2, titleY, '⚠️ Guest Account', {
+      fontSize: `${Math.max(14, 16 * uiScale)}px`,
+      color: '#FFD700',
+      fontFamily: 'Cinzel, serif',
+      stroke: '#000000',
+      strokeThickness: 1
+    }).setOrigin(0.5).setDepth(302);
+    
+    // Info text
+    const textY = titleY + 25;
+    const infoText = this.add.text(width / 2, textY, 'Your progress is stored locally.\nCreate an account to secure your data!', {
+      fontSize: `${Math.max(11, 13 * uiScale)}px`,
+      color: '#F5F5DC',
+      fontFamily: 'Cinzel, serif',
+      align: 'center',
+      lineSpacing: 4,
+      wordWrap: { width: popupWidth - 30 }
+    }).setOrigin(0.5).setDepth(302);
+    
+    // Close button
+    const closeButtonY = height / 2 + popupHeight / 2 - 25;
+    const closeButton = this.add.text(width / 2, closeButtonY, 'Close', {
+      fontSize: `${Math.max(10, 12 * uiScale)}px`,
+      color: '#C0C0C0',
+      fontFamily: 'Cinzel, serif',
+      backgroundColor: '#666666',
+      padding: { x: 15, y: 8 }
+    }).setOrigin(0.5).setDepth(302).setInteractive({ useHandCursor: true });
+    
+    // Close functionality
+    const closePopup = () => {
+      overlay.destroy();
+      panel.destroy();
+      title.destroy();
+      infoText.destroy();
+      closeButton.destroy();
+    };
+    
+    closeButton.on('pointerdown', closePopup);
+    overlay.on('pointerdown', closePopup);
+    
+    // Hover effects
+    closeButton.on('pointerover', () => {
+      closeButton.setBackgroundColor('#888888');
+    });
+    
+    closeButton.on('pointerout', () => {
+      closeButton.setBackgroundColor('#666666');
+    });
   }
 
   private async loadCharacters() {
@@ -207,37 +347,49 @@ export class CharacterSelectionScene extends Scene {
     const isMobile = ResponsiveLayout.isMobile(width, height);
     const mobileAdjustments = ResponsiveLayout.getMobileAdjustments(width, height);
     
-    // Responsive slot dimensions
-    const baseSlotWidth = isMobile ? 200 : 240;
-    const baseSlotHeight = isMobile ? 320 : 360;
-    const slotWidth = Math.max(180, baseSlotWidth * uiScale);
-    const slotHeight = Math.max(280, baseSlotHeight * uiScale);
-    const spacing = Math.max(20, 60 * uiScale);
+    // Responsive slot dimensions for different screen sizes - scale containers with content
+    let baseSlotWidth, baseSlotHeight;
+    if (width < 600) {
+      // Mobile phones
+      baseSlotWidth = 160;
+      baseSlotHeight = 280;
+    } else if (width < 1024) {
+      // Tablets
+      baseSlotWidth = 200;
+      baseSlotHeight = 320;
+    } else if (width < 1440) {
+      // Small desktop - larger containers to fit scaled content
+      baseSlotWidth = 260;
+      baseSlotHeight = 380;
+    } else {
+      // Large desktop - even larger containers for scaled content
+      baseSlotWidth = 300;
+      baseSlotHeight = 420;
+    }
     
-    // Check if we need to stack vertically on very small screens
-    const stackVertically = isMobile && mobileAdjustments.isPortrait && width < 600;
+    // Scale containers properly with UI scale
+    const slotWidth = Math.max(140, baseSlotWidth * uiScale);
+    const slotHeight = Math.max(220, baseSlotHeight * uiScale);
+    const spacing = Math.max(20, 60 * uiScale);
     
     // Adjust slot positioning based on whether guest warning is shown
     const isGuest = localStorage.getItem('hemoclast_is_guest');
     const isRegistered = localStorage.getItem('hemoclast_is_registered');
     const showGuestWarning = isGuest && !isRegistered;
     
-    if (stackVertically) {
-      // Stack character slots vertically on very small screens
-      const startY = showGuestWarning ? height * 0.35 : height * 0.25;
-      const slotX = width / 2;
-      
-      for (let i = 0; i < 3; i++) {
-        const y = startY + i * (slotHeight + spacing);
-        const character = this.characters[i] || null;
-        
-        this.createCharacterSlot(slotX, y, slotWidth, slotHeight, character, i);
-      }
+    // Check if we need mobile navigation arrows
+    const isActualMobileDevice = ResponsiveLayout.isMobileDevice();
+    const needsMobileNavigation = (isActualMobileDevice || width < 500) && isMobile && mobileAdjustments.isPortrait;
+    
+    if (needsMobileNavigation) {
+      // Mobile: Show one card at a time with navigation arrows
+      this.createMobileCardNavigation(!!showGuestWarning, slotWidth, slotHeight, width, height);
     } else {
-      // Horizontal layout for desktop and larger mobile screens
+      // Desktop: Show all 3 cards horizontally
       const totalWidth = (3 * slotWidth) + (2 * spacing);
       const startX = (width - totalWidth) / 2 + slotWidth / 2;
-      const slotY = showGuestWarning ? height * 0.60 : height * 0.50;
+      // Position cards with better spacing after Enter World button
+      const slotY = showGuestWarning ? height * 0.55 : height * 0.50;
       
       // Display 3 character slots horizontally
       for (let i = 0; i < 3; i++) {
@@ -248,6 +400,112 @@ export class CharacterSelectionScene extends Scene {
       }
     }
   }
+
+  private currentMobileCardIndex: number = 0;
+
+  private createMobileCardNavigation(showGuestWarning: boolean, slotWidth: number, slotHeight: number, width: number, height: number) {
+    // Position mobile cards with better spacing after Enter World button
+    const slotY = showGuestWarning ? height * 0.55 : height * 0.50;
+    const slotX = width / 2;
+    
+    // Display current character card
+    const character = this.characters[this.currentMobileCardIndex] || null;
+    this.createCharacterSlot(slotX, slotY, slotWidth, slotHeight, character, this.currentMobileCardIndex);
+    
+    // Create navigation arrows
+    const arrowY = slotY;
+    const arrowSize = Math.max(30, 40 * ResponsiveLayout.getUIScale(width, height));
+    const arrowDistance = slotWidth / 2 + 60;
+    
+    // Left arrow
+    if (this.currentMobileCardIndex > 0) {
+      const leftArrow = this.add.text(slotX - arrowDistance, arrowY, '◀', {
+        fontSize: `${arrowSize}px`,
+        color: '#FFD700',
+        fontFamily: 'Arial'
+      }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      
+      leftArrow.on('pointerdown', () => {
+        this.currentMobileCardIndex = Math.max(0, this.currentMobileCardIndex - 1);
+        this.refreshMobileCardDisplay();
+      });
+      
+      leftArrow.on('pointerover', () => {
+        leftArrow.setColor('#FFFFFF');
+        leftArrow.setScale(1.2);
+      });
+      
+      leftArrow.on('pointerout', () => {
+        leftArrow.setColor('#FFD700');
+        leftArrow.setScale(1.0);
+      });
+    }
+    
+    // Right arrow
+    if (this.currentMobileCardIndex < 2) {
+      const rightArrow = this.add.text(slotX + arrowDistance, arrowY, '▶', {
+        fontSize: `${arrowSize}px`,
+        color: '#FFD700',
+        fontFamily: 'Arial'
+      }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      
+      rightArrow.on('pointerdown', () => {
+        this.currentMobileCardIndex = Math.min(2, this.currentMobileCardIndex + 1);
+        this.refreshMobileCardDisplay();
+      });
+      
+      rightArrow.on('pointerover', () => {
+        rightArrow.setColor('#FFFFFF');
+        rightArrow.setScale(1.2);
+      });
+      
+      rightArrow.on('pointerout', () => {
+        rightArrow.setColor('#FFD700');
+        rightArrow.setScale(1.0);
+      });
+    }
+    
+    // Add card indicator dots
+    this.createCardIndicators(width, height, showGuestWarning);
+  }
+  
+  private createCardIndicators(width: number, height: number, showGuestWarning: boolean) {
+    // Position dots right below the delete button area - updated for new card position
+    const cardY = showGuestWarning ? height * 0.55 : height * 0.50; // Updated to match new card position
+    const cardHeight = Math.max(220, 420 * ResponsiveLayout.getUIScale(width, height)); // Updated to match larger cards
+    const indicatorY = cardY + cardHeight / 2 + 25; // Further down, below delete button
+    const dotSpacing = 30;
+    const startX = width / 2 - dotSpacing;
+    
+    for (let i = 0; i < 3; i++) {
+      const x = startX + i * dotSpacing;
+      const isActive = i === this.currentMobileCardIndex;
+      const hasCharacter = this.characters[i] !== null && this.characters[i] !== undefined;
+      
+      let color = '#666666'; // Empty slot
+      if (hasCharacter) {
+        color = isActive ? '#FFD700' : '#C0C0C0'; // Has character
+      }
+      
+      const dot = this.add.circle(x, indicatorY, isActive ? 8 : 6, parseInt(color.replace('#', '0x')));
+      dot.setStrokeStyle(2, 0x8B0000);
+      
+      // Make dots clickable
+      dot.setInteractive({ useHandCursor: true });
+      dot.on('pointerdown', () => {
+        this.currentMobileCardIndex = i;
+        this.refreshMobileCardDisplay();
+      });
+    }
+  }
+  
+  private refreshMobileCardDisplay() {
+    // Clear existing display and recreate
+    this.children.removeAll();
+    this.create();
+  }
+
+
 
   private createCharacterSlot(x: number, y: number, width: number, height: number, character: any, slotIndex: number) {
     // Use responsive text scaling for character slot text - increased base sizes
@@ -316,61 +574,121 @@ export class CharacterSelectionScene extends Scene {
     const { width: screenWidth, height: screenHeight } = this.scale;
     const uiScale = ResponsiveLayout.getUIScale(screenWidth, screenHeight);
     
-    // Character portrait placeholder - responsive sizing
-    const portraitRadius = Math.max(45, 65 * uiScale);
-    const portraitY = y - Math.max(80, 100 * uiScale);
-    const portrait = this.add.circle(x, portraitY, portraitRadius, this.getClassColor(character.character_class));
-    portrait.setStrokeStyle(Math.max(2, 4 * uiScale), 0x8B0000);
+    // Check if this is actually a mobile device/layout
+    const isMobile = ResponsiveLayout.isMobile(screenWidth, screenHeight);
+    const mobileAdjustments = ResponsiveLayout.getMobileAdjustments(screenWidth, screenHeight);
+    const isActualMobileDevice = ResponsiveLayout.isMobileDevice();
+    const isMobileLayout = (isActualMobileDevice || screenWidth < 400) && isMobile && mobileAdjustments.isPortrait;
     
-    // Class icon - responsive sizing and positioning
+    // Character portrait placeholder - responsive sizing for different screen sizes
+    let portraitRadius, portraitY, strokeWidth;
+    if (isMobileLayout) {
+      portraitRadius = Math.max(35, 50 * uiScale);
+      portraitY = y - Math.max(60, 80 * uiScale);
+      strokeWidth = Math.max(2, 3 * uiScale);
+    } else if (screenWidth < 1024) {
+      // Tablet
+      portraitRadius = Math.max(50, 70 * uiScale);
+      portraitY = y - Math.max(90, 110 * uiScale);
+      strokeWidth = Math.max(3, 4 * uiScale);
+    } else {
+      // Desktop
+      portraitRadius = Math.max(60, 80 * uiScale);
+      portraitY = y - Math.max(100, 120 * uiScale);
+      strokeWidth = Math.max(3, 5 * uiScale);
+    }
+    
+    const portrait = this.add.circle(x, portraitY, portraitRadius, this.getClassColor(character.character_class));
+    portrait.setStrokeStyle(strokeWidth, 0x8B0000);
+    
+    // Class icon - responsive sizing for different screen sizes
+    let iconFontSize;
+    if (isMobileLayout) {
+      iconFontSize = Math.max(20, 28 * uiScale);
+    } else if (screenWidth < 1024) {
+      // Tablet
+      iconFontSize = Math.max(28, 36 * uiScale);
+    } else {
+      // Desktop
+      iconFontSize = ResponsiveLayout.getScaledFontSize(40, screenWidth, screenHeight);
+    }
+    
     this.add.text(x, portraitY, this.getClassIcon(character.character_class), {
-      fontSize: `${ResponsiveLayout.getScaledFontSize(32, screenWidth, screenHeight)}px`
+      fontSize: `${iconFontSize}px`
     }).setOrigin(0.5);
     
-    // Character name - responsive positioning
-    const nameY = y - Math.max(15, 20 * uiScale);
+    // Character name - mobile-specific positioning
+    const nameY = isMobileLayout ? y - Math.max(10, 15 * uiScale) : y - Math.max(15, 20 * uiScale);
     this.add.text(x, nameY, character.name, {
-      fontSize: `${fontSize}px`,
+      fontSize: isMobileLayout ? `${Math.max(14, fontSize * uiScale)}px` : `${fontSize}px`,
       color: '#F5F5DC',
       fontFamily: 'Cinzel, serif'
     }).setOrigin(0.5);
     
-    // Character class and level - responsive positioning
-    const classLevelY = nameY + Math.max(25, 30 * uiScale);
+    // Character class and level - mobile-specific positioning
+    const classLevelY = isMobileLayout ? nameY + Math.max(20, 25 * uiScale) : nameY + Math.max(25, 30 * uiScale);
     this.add.text(x, classLevelY, `${character.character_class} • Level ${character.level}`, {
-      fontSize: `${ResponsiveLayout.getScaledFontSize(14, screenWidth, screenHeight)}px`,
+      fontSize: isMobileLayout ? `${Math.max(10, 12 * uiScale)}px` : `${ResponsiveLayout.getScaledFontSize(14, screenWidth, screenHeight)}px`,
       color: '#C0C0C0',
       fontFamily: 'Cinzel, serif'
     }).setOrigin(0.5);
     
-    // Select button - responsive dimensions and positioning
-    const buttonDimensions = ResponsiveLayout.getTouchFriendlyButton(140, 40, screenWidth, screenHeight);
-    const buttonY = y + Math.max(70, 90 * uiScale);
+    // Select button - responsive dimensions for different screen sizes
+    let selectButtonWidth, selectButtonHeight, selectButtonFontSize;
+    if (isMobileLayout) {
+      selectButtonWidth = Math.max(100, 130 * uiScale);
+      selectButtonHeight = Math.max(28, 35 * uiScale);
+      selectButtonFontSize = Math.max(10, buttonFontSize * uiScale);
+    } else if (screenWidth < 1024) {
+      // Tablet
+      selectButtonWidth = Math.max(140, 170 * uiScale);
+      selectButtonHeight = Math.max(35, 42 * uiScale);
+      selectButtonFontSize = Math.max(12, buttonFontSize);
+    } else {
+      // Desktop - use original ResponsiveLayout sizing
+      const touchFriendly = ResponsiveLayout.getTouchFriendlyButton(160, 50, screenWidth, screenHeight);
+      selectButtonWidth = touchFriendly.width;
+      selectButtonHeight = touchFriendly.height;
+      selectButtonFontSize = buttonFontSize;
+    }
+    
+    const buttonY = isMobileLayout ? y + Math.max(50, 65 * uiScale) : y + Math.max(70, 90 * uiScale);
     GraphicsUtils.createRuneScapeButton(
       this,
       x,
       buttonY,
-      buttonDimensions.width,
-      buttonDimensions.height,
+      selectButtonWidth,
+      selectButtonHeight,
       'Select',
-      buttonFontSize,
+      selectButtonFontSize,
       () => this.selectCharacter(character)
     );
     
-    // Enhanced Delete button with responsive positioning
+    // Enhanced Delete button with mobile-specific positioning
     const deleteButton = this.add.graphics();
-    const deleteButtonY = buttonY + Math.max(50, 60 * uiScale);
+    const deleteButtonY = isMobileLayout ? buttonY + Math.max(35, 45 * uiScale) : buttonY + Math.max(50, 60 * uiScale);
     const deleteText = this.add.text(x, deleteButtonY, 'Delete', {
-      fontSize: `${ResponsiveLayout.getScaledFontSize(12, screenWidth, screenHeight)}px`,
+      fontSize: isMobileLayout ? `${Math.max(8, 10 * uiScale)}px` : `${ResponsiveLayout.getScaledFontSize(12, screenWidth, screenHeight)}px`,
       color: '#FFD700',
       fontFamily: 'Cinzel, serif',
       stroke: '#000000',
       strokeThickness: Math.max(1, uiScale)
     }).setOrigin(0.5);
     
-    // Responsive delete button dimensions
-    const deleteButtonWidth = Math.max(80, 100 * uiScale);
-    const deleteButtonHeight = Math.max(25, 30 * uiScale);
+    // Responsive delete button dimensions for different screen sizes
+    let deleteButtonWidth, deleteButtonHeight;
+    if (isMobileLayout) {
+      deleteButtonWidth = Math.max(60, 80 * uiScale);
+      deleteButtonHeight = Math.max(20, 25 * uiScale);
+    } else if (screenWidth < 1024) {
+      // Tablet
+      deleteButtonWidth = Math.max(90, 110 * uiScale);
+      deleteButtonHeight = Math.max(28, 32 * uiScale);
+    } else {
+      // Desktop
+      deleteButtonWidth = Math.max(100, 120 * uiScale);
+      deleteButtonHeight = Math.max(30, 35 * uiScale);
+    }
     
     // Draw delete button with danger styling
     const drawDeleteButton = (bgColor: number, borderColor: number, glowing: boolean = false) => {
@@ -380,11 +698,11 @@ export class CharacterSelectionScene extends Scene {
       if (glowing) {
         deleteButton.fillStyle(borderColor, 0.3);
         deleteButton.fillRoundedRect(
-          x - deleteButtonWidth / 2 - 4, 
-          deleteButtonY - deleteButtonHeight / 2 - 4, 
-          deleteButtonWidth + 8, 
-          deleteButtonHeight + 8, 
-          Math.max(4, 6 * uiScale)
+          x - deleteButtonWidth / 2 - 3, 
+          deleteButtonY - deleteButtonHeight / 2 - 3, 
+          deleteButtonWidth + 6, 
+          deleteButtonHeight + 6, 
+          Math.max(3, 5 * uiScale)
         );
       }
       
@@ -395,7 +713,7 @@ export class CharacterSelectionScene extends Scene {
         deleteButtonY - deleteButtonHeight / 2, 
         deleteButtonWidth, 
         deleteButtonHeight, 
-        Math.max(3, 4 * uiScale)
+        Math.max(2, 3 * uiScale)
       );
       
       // Border
@@ -405,15 +723,15 @@ export class CharacterSelectionScene extends Scene {
         deleteButtonY - deleteButtonHeight / 2, 
         deleteButtonWidth, 
         deleteButtonHeight, 
-        Math.max(3, 4 * uiScale)
+        Math.max(2, 3 * uiScale)
       );
     };
     
     // Initial button state
     drawDeleteButton(0x4a0000, 0xDC143C);
     
-    // Enhanced interactive area with proper cursor
-    const deleteHitArea = this.add.rectangle(x, y + 140, 110, 35, 0x000000, 0) // Moved down from 120 to 140
+    // Enhanced interactive area with proper cursor - mobile-specific sizing
+    const deleteHitArea = this.add.rectangle(x, deleteButtonY, deleteButtonWidth + 10, deleteButtonHeight + 10, 0x000000, 0)
       .setInteractive({ useHandCursor: true });
     
     // Enhanced hover effects
@@ -453,58 +771,123 @@ export class CharacterSelectionScene extends Scene {
     const { width: screenWidth, height: screenHeight } = this.scale;
     const uiScale = ResponsiveLayout.getUIScale(screenWidth, screenHeight);
     
-    // Empty slot icon - responsive sizing and positioning
-    const iconY = y - Math.max(50, 70 * uiScale);
+    // Check if this is actually a mobile device/layout
+    const isMobile = ResponsiveLayout.isMobile(screenWidth, screenHeight);
+    const mobileAdjustments = ResponsiveLayout.getMobileAdjustments(screenWidth, screenHeight);
+    const isActualMobileDevice = ResponsiveLayout.isMobileDevice();
+    const isMobileLayout = (isActualMobileDevice || screenWidth < 400) && isMobile && mobileAdjustments.isPortrait;
+    
+    // Empty slot icon - responsive sizing for different screen sizes
+    let iconY, iconFontSize;
+    if (isMobileLayout) {
+      iconY = y - Math.max(40, 60 * uiScale);
+      iconFontSize = Math.max(30, 40 * uiScale);
+    } else if (screenWidth < 1024) {
+      // Tablet
+      iconY = y - Math.max(60, 80 * uiScale);
+      iconFontSize = Math.max(40, 50 * uiScale);
+    } else {
+      // Desktop
+      iconY = y - Math.max(70, 90 * uiScale);
+      iconFontSize = ResponsiveLayout.getScaledFontSize(60, screenWidth, screenHeight);
+    }
+    
     this.add.text(x, iconY, '➕', {
-      fontSize: `${ResponsiveLayout.getScaledFontSize(48, screenWidth, screenHeight)}px`,
+      fontSize: `${iconFontSize}px`,
       color: '#666666'
     }).setOrigin(0.5);
     
-    // Create character text - responsive positioning
-    const textY = y - Math.max(5, 10 * uiScale);
+    // Create character text - mobile-specific positioning
+    const textY = isMobileLayout ? y - Math.max(5, 10 * uiScale) : y - Math.max(5, 10 * uiScale);
     this.add.text(x, textY, 'Create New\nCharacter', {
-      fontSize: `${fontSize}px`,
+      fontSize: isMobileLayout ? `${Math.max(12, fontSize * uiScale)}px` : `${fontSize}px`,
       color: '#C0C0C0',
       fontFamily: 'Cinzel, serif',
       align: 'center'
     }).setOrigin(0.5);
     
-    // Create button - responsive dimensions and positioning
-    const buttonDimensions = ResponsiveLayout.getTouchFriendlyButton(140, 40, screenWidth, screenHeight);
-    const buttonY = y + Math.max(70, 90 * uiScale);
+    // Create button - responsive dimensions for different screen sizes
+    let createButtonWidth, createButtonHeight, createButtonFontSize;
+    if (isMobileLayout) {
+      createButtonWidth = Math.max(100, 130 * uiScale);
+      createButtonHeight = Math.max(28, 35 * uiScale);
+      createButtonFontSize = Math.max(10, buttonFontSize * uiScale);
+    } else if (screenWidth < 1024) {
+      // Tablet
+      createButtonWidth = Math.max(140, 170 * uiScale);
+      createButtonHeight = Math.max(35, 42 * uiScale);
+      createButtonFontSize = Math.max(12, buttonFontSize);
+    } else {
+      // Desktop - use original ResponsiveLayout sizing
+      const touchFriendly = ResponsiveLayout.getTouchFriendlyButton(160, 50, screenWidth, screenHeight);
+      createButtonWidth = touchFriendly.width;
+      createButtonHeight = touchFriendly.height;
+      createButtonFontSize = buttonFontSize;
+    }
+    
+    const buttonY = isMobileLayout ? y + Math.max(50, 65 * uiScale) : y + Math.max(70, 90 * uiScale);
     GraphicsUtils.createRuneScapeButton(
       this,
       x,
       buttonY,
-      buttonDimensions.width,
-      buttonDimensions.height,
+      createButtonWidth,
+      createButtonHeight,
       'Create',
-      buttonFontSize,
+      createButtonFontSize,
       () => this.createNewCharacter()
     );
   }
 
   private createEnterWorldButton() {
     const { width, height } = this.scale;
+    const uiScale = ResponsiveLayout.getUIScale(width, height);
     
     // Check if a character is selected
     const selectedCharacterId = localStorage.getItem('hemoclast_character_id');
     const isCharacterSelected = selectedCharacterId && this.characters.some(char => char && char.id.toString() === selectedCharacterId);
     
-    // Position below character slots
+    // Position Enter World button just above the character cards
     const isGuest = localStorage.getItem('hemoclast_is_guest');
     const isRegistered = localStorage.getItem('hemoclast_is_registered');
     const showGuestWarning = isGuest && !isRegistered;
-    const buttonY = showGuestWarning ? height * 0.85 : height * 0.80;
     
-    // Create Enter World button with responsive button font scaling
-    const buttonFontSize = ResponsiveLayout.getButtonFontSize(18, width, height);
+    // Calculate where cards will be positioned and place button above them
+    let buttonY;
+    if (showGuestWarning) {
+      buttonY = height * 0.42; // Above cards when guest warning is shown
+    } else {
+      buttonY = height * 0.38; // Above cards when no guest warning
+    }
+    
+    // Responsive button dimensions for different screen sizes
+    const buttonFontSize = ResponsiveLayout.getButtonFontSize(16, width, height);
+    let enterButtonWidth, enterButtonHeight;
+    
+    // Check screen type for appropriate sizing
+    const isMobile = ResponsiveLayout.isMobile(width, height);
+    const mobileAdjustments = ResponsiveLayout.getMobileAdjustments(width, height);
+    const isActualMobileDevice = ResponsiveLayout.isMobileDevice();
+    const isMobileLayout = (isActualMobileDevice || width < 400) && isMobile && mobileAdjustments.isPortrait;
+    
+    if (isMobileLayout) {
+      enterButtonWidth = Math.max(120, 150 * uiScale);
+      enterButtonHeight = Math.max(24, buttonFontSize + 8);
+    } else if (width < 1024) {
+      // Tablet
+      enterButtonWidth = Math.max(160, 200 * uiScale);
+      enterButtonHeight = Math.max(32, buttonFontSize + 12);
+    } else {
+      // Desktop
+      enterButtonWidth = Math.max(180, 220 * uiScale);
+      enterButtonHeight = Math.max(36, buttonFontSize + 16);
+    }
+    
     const enterWorldButton = GraphicsUtils.createRuneScapeButton(
       this,
       width / 2,
       buttonY,
-      180,
-      50,
+      enterButtonWidth,
+      enterButtonHeight,
       'Enter World',
       buttonFontSize,
       () => this.enterWorld()
@@ -520,12 +903,36 @@ export class CharacterSelectionScene extends Scene {
   
   private createBottomLeftButtons() {
     const { width, height } = this.scale;
-    const buttonX = 100;
-    const buttonSpacing = 45;
-    const bottomMargin = 30;
+    
+    // Check if this is actually a mobile device/layout
+    const isMobile = ResponsiveLayout.isMobile(width, height);
+    const mobileAdjustments = ResponsiveLayout.getMobileAdjustments(width, height);
+    const isActualMobileDevice = ResponsiveLayout.isMobileDevice();
+    const isMobileLayout = (isActualMobileDevice || width < 400) && isMobile && mobileAdjustments.isPortrait;
     
     // Use responsive button font scaling
     const buttonFontSize = ResponsiveLayout.getButtonFontSize(14, width, height);
+    const uiScale = ResponsiveLayout.getUIScale(width, height);
+    
+    // Mobile-specific smaller sizing, desktop keeps original size
+    let buttonWidth, buttonHeight, buttonX, buttonSpacing, bottomMargin;
+    
+    if (isMobileLayout) {
+      // Mobile: smaller buttons, moved further inward
+      buttonWidth = Math.max(60, 70 * uiScale);  // Even smaller width for mobile
+      buttonHeight = Math.max(20, buttonFontSize + 4); // Smaller height for mobile
+      buttonX = Math.max(35, 45 * uiScale);      // Moved even further inward for mobile
+      buttonSpacing = Math.max(25, 28 * uiScale); // Tighter spacing for mobile
+      bottomMargin = Math.max(15, 20 * uiScale);  // Less bottom margin for mobile
+    } else {
+      // Desktop: scale properly and ensure they don't fall off screen
+      buttonWidth = Math.max(80, 120 * uiScale);
+      buttonHeight = Math.max(30, 40 * uiScale);
+      // Ensure buttons stay on screen - use percentage of screen width with minimum distance
+      buttonX = Math.max(30, Math.min(50 * uiScale, width * 0.05));
+      buttonSpacing = Math.max(35, 45 * uiScale);
+      bottomMargin = Math.max(25, 35 * uiScale);
+    }
     
     // Stack buttons vertically with logout at the bottom
     const logoutY = height - bottomMargin;
@@ -537,8 +944,8 @@ export class CharacterSelectionScene extends Scene {
       this,
       buttonX,
       creditsY,
-      100,
-      35,
+      buttonWidth,
+      buttonHeight,
       'Credits',
       buttonFontSize,
       () => this.goToCredits()
@@ -549,20 +956,20 @@ export class CharacterSelectionScene extends Scene {
       this,
       buttonX,
       settingsY,
-      100,
-      35,
+      buttonWidth,
+      buttonHeight,
       'Settings',
       buttonFontSize,
       () => this.goToSettings()
     );
     
-    // Logout button (bottom)
+    // Logout button (bottom) - slightly wider for arrow
     GraphicsUtils.createRuneScapeButton(
       this,
       buttonX,
       logoutY,
-      120,
-      35,
+      isMobileLayout ? Math.max(buttonWidth, 75 * uiScale) : Math.max(buttonWidth, 110 * uiScale),
+      buttonHeight,
       '← Logout',
       buttonFontSize,
       () => this.logout()
@@ -1098,19 +1505,22 @@ export class CharacterSelectionScene extends Scene {
     });
   
     
-    // Responsive button dimensions
-    const buttonDimensions = ResponsiveLayout.getTouchFriendlyButton(140, 40, width, height);
+    // Responsive button dimensions - make buttons just big enough for text
     const buttonFontSize = ResponsiveLayout.getButtonFontSize(13, width, height);
-    const buttonY = height / 2 + dialogHeight / 2 - Math.max(35, 40 * scale); // Reduced gap
-    const buttonSpacing = isMobile ? buttonDimensions.width / 2 + 25 * scale : Math.max(90, 100 * scale);
+    const createButtonWidth = Math.max(120, 140 * scale);
+    const createButtonHeight = Math.max(24, buttonFontSize + 8);
+    const continueButtonWidth = Math.max(140, 160 * scale);
+    const continueButtonHeight = Math.max(24, buttonFontSize + 8);
+    const buttonY = height / 2 + dialogHeight / 2 - Math.max(35, 40 * scale);
+    const buttonSpacing = isMobile ? Math.max(80, 90 * scale) : Math.max(100, 110 * scale);
     
     // Create account button - responsive
     const createBtn = GraphicsUtils.createRuneScapeButton(
       this,
       width / 2 - buttonSpacing,
       buttonY,
-      buttonDimensions.width,
-      buttonDimensions.height,
+      createButtonWidth,
+      createButtonHeight,
       'CREATE ACCOUNT',
       buttonFontSize,
       () => {
@@ -1125,8 +1535,8 @@ export class CharacterSelectionScene extends Scene {
       this,
       width / 2 + buttonSpacing,
       buttonY,
-      buttonDimensions.width,
-      buttonDimensions.height,
+      continueButtonWidth,
+      continueButtonHeight,
       'CONTINUE TO SELECT',
       buttonFontSize,
       () => {
@@ -1238,19 +1648,22 @@ export class CharacterSelectionScene extends Scene {
       wordWrap: { width: dialogWidth - 40 }
     }).setOrigin(0.5).setDepth(202);
     
-    // Responsive button dimensions
-    const buttonDimensions = ResponsiveLayout.getTouchFriendlyButton(180, 40, width, height);
+    // Responsive button dimensions - make buttons just big enough for text
     const buttonFontSize = ResponsiveLayout.getButtonFontSize(13, width, height);
+    const continueButtonWidth = Math.max(140, 160 * scale);
+    const continueButtonHeight = Math.max(24, buttonFontSize + 8);
+    const createButtonWidth = Math.max(120, 140 * scale);
+    const createButtonHeight = Math.max(24, buttonFontSize + 8);
     const buttonY = height / 2 - dialogHeight / 2 + Math.max(150, 160 * scale);
-    const buttonSpacing = isMobile ? buttonDimensions.width / 2 + 20 * scale : Math.max(110, 120 * scale);
+    const buttonSpacing = isMobile ? Math.max(90, 100 * scale) : Math.max(110, 120 * scale);
     
     // Continue to select button - stays in character selection
     const continueBtn = GraphicsUtils.createRuneScapeButton(
       this,
       width / 2 - buttonSpacing,
       buttonY,
-      buttonDimensions.width,
-      buttonDimensions.height,
+      continueButtonWidth,
+      continueButtonHeight,
       'Continue to Select',
       buttonFontSize,
       () => {
@@ -1266,8 +1679,8 @@ export class CharacterSelectionScene extends Scene {
       this,
       width / 2 + buttonSpacing,
       buttonY,
-      buttonDimensions.width,
-      buttonDimensions.height,
+      createButtonWidth,
+      createButtonHeight,
       'Create Account',
       buttonFontSize,
       () => {
