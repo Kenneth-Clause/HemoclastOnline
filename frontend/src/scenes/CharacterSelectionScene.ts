@@ -129,7 +129,7 @@ export class CharacterSelectionScene extends Scene {
       const panelHeight = Math.max(28, 35 * uiScale);
       let panelWidth;
       if (isMobileLayout) {
-        panelWidth = Math.min(140, width * 0.4); // Much more compact for mobile
+        panelWidth = Math.min(154, width * 0.44); // Much more compact for mobile - scaled up 10%
       } else if (width < 1024) {
         panelWidth = Math.min(180, width * 0.25); // Compact for tablet
       } else {
@@ -207,8 +207,8 @@ export class CharacterSelectionScene extends Scene {
     // Responsive popup dimensions - taller to accommodate the Create Account button
     let popupWidth, popupHeight;
     if (isMobileLayout) {
-      popupWidth = Math.min(300, width * 0.9);
-      popupHeight = 220; // Increased height for buttons
+      popupWidth = Math.min(330, width * 0.99);
+      popupHeight = 242; // Increased height for buttons - scaled up 10%
     } else if (width < 1024) {
       // Tablet
       popupWidth = Math.min(420, width * 0.75);
@@ -243,24 +243,24 @@ export class CharacterSelectionScene extends Scene {
     }).setOrigin(0.5).setDepth(302);
     
     // Info text - moved further down from title for better spacing
-    const textY = titleY + (isMobileLayout ? 72 : 70);
+    const textY = titleY + (isMobileLayout ? 79 : 70);
     const infoText = this.add.text(width / 2, textY, 'Your progress is stored locally.\nCreate an account to secure your data!', {
       fontSize: `${Math.max(11, 13 * uiScale)}px`,
       color: '#F5F5DC',
       fontFamily: 'Cinzel, serif',
       align: 'center',
-      lineSpacing: isMobileLayout ? 5 : 6,
+      lineSpacing: isMobileLayout ? 5.5 : 6,
       wordWrap: { width: popupWidth - 50 }
     }).setOrigin(0.5).setDepth(302);
     
     // Button dimensions - responsive
-    const buttonFontSize = ResponsiveLayout.getButtonFontSize(isMobileLayout ? 12 : 14, width, height);
+    const buttonFontSize = ResponsiveLayout.getButtonFontSize(isMobileLayout ? 13 : 14, width, height);
     let buttonWidth, buttonHeight, buttonSpacing;
     
     if (isMobileLayout) {
-      buttonWidth = Math.max(120, 140 * uiScale);
-      buttonHeight = Math.max(28, buttonFontSize + 8);
-      buttonSpacing = 12; // Closer vertical spacing between buttons
+      buttonWidth = Math.max(132, 154 * uiScale);
+      buttonHeight = Math.max(31, buttonFontSize + 9);
+      buttonSpacing = 13; // Closer vertical spacing between buttons - scaled up 10%
     } else {
       buttonWidth = Math.max(140, 160 * uiScale);
       buttonHeight = Math.max(32, buttonFontSize + 10);
@@ -268,7 +268,7 @@ export class CharacterSelectionScene extends Scene {
     }
     
     // Position buttons below the text with proper spacing
-    const buttonsStartY = textY + (isMobileLayout ? 50 : 60);
+    const buttonsStartY = textY + (isMobileLayout ? 55 : 60);
     
     // Create Account button - positioned above Close button
     const createAccountY = buttonsStartY;
@@ -620,9 +620,9 @@ export class CharacterSelectionScene extends Scene {
     // Character portrait placeholder - responsive sizing for different screen sizes
     let portraitRadius, portraitY, strokeWidth;
     if (isMobileLayout) {
-      portraitRadius = Math.max(35, 50 * uiScale);
-      portraitY = y - Math.max(60, 80 * uiScale);
-      strokeWidth = Math.max(2, 3 * uiScale);
+      portraitRadius = Math.max(39, 55 * uiScale);
+      portraitY = y - Math.max(66, 88 * uiScale);
+      strokeWidth = Math.max(2, 3.3 * uiScale);
     } else if (screenWidth < 1024) {
       // Tablet
       portraitRadius = Math.max(50, 70 * uiScale);
@@ -641,7 +641,7 @@ export class CharacterSelectionScene extends Scene {
     // Class icon - responsive sizing for different screen sizes
     let iconFontSize;
     if (isMobileLayout) {
-      iconFontSize = Math.max(20, 28 * uiScale);
+      iconFontSize = Math.max(22, 31 * uiScale);
     } else if (screenWidth < 1024) {
       // Tablet
       iconFontSize = Math.max(28, 36 * uiScale);
@@ -655,17 +655,17 @@ export class CharacterSelectionScene extends Scene {
     }).setOrigin(0.5);
     
     // Character name - mobile-specific positioning
-    const nameY = isMobileLayout ? y - Math.max(10, 15 * uiScale) : y - Math.max(15, 20 * uiScale);
+    const nameY = isMobileLayout ? y - Math.max(11, 16.5 * uiScale) : y - Math.max(15, 20 * uiScale);
     this.add.text(x, nameY, character.name, {
-      fontSize: isMobileLayout ? `${Math.max(14, fontSize * uiScale)}px` : `${fontSize}px`,
+      fontSize: isMobileLayout ? `${Math.max(15, fontSize * 1.1 * uiScale)}px` : `${fontSize}px`,
       color: '#F5F5DC',
       fontFamily: 'Cinzel, serif'
     }).setOrigin(0.5);
     
     // Character class and level - mobile-specific positioning
-    const classLevelY = isMobileLayout ? nameY + Math.max(20, 25 * uiScale) : nameY + Math.max(25, 30 * uiScale);
+    const classLevelY = isMobileLayout ? nameY + Math.max(22, 27.5 * uiScale) : nameY + Math.max(25, 30 * uiScale);
     this.add.text(x, classLevelY, `${character.character_class} • Level ${character.level}`, {
-      fontSize: isMobileLayout ? `${Math.max(10, 12 * uiScale)}px` : `${ResponsiveLayout.getScaledFontSize(14, screenWidth, screenHeight)}px`,
+      fontSize: isMobileLayout ? `${Math.max(11, 13.2 * uiScale)}px` : `${ResponsiveLayout.getScaledFontSize(14, screenWidth, screenHeight)}px`,
       color: '#C0C0C0',
       fontFamily: 'Cinzel, serif'
     }).setOrigin(0.5);
@@ -673,9 +673,9 @@ export class CharacterSelectionScene extends Scene {
     // Select button - responsive dimensions for different screen sizes
     let selectButtonWidth, selectButtonHeight, selectButtonFontSize;
     if (isMobileLayout) {
-      selectButtonWidth = Math.max(100, 130 * uiScale);
-      selectButtonHeight = Math.max(28, 35 * uiScale);
-      selectButtonFontSize = Math.max(10, buttonFontSize * uiScale);
+      selectButtonWidth = Math.max(110, 143 * uiScale);
+      selectButtonHeight = Math.max(31, 38.5 * uiScale);
+      selectButtonFontSize = Math.max(11, buttonFontSize * 1.1 * uiScale);
     } else if (screenWidth < 1024) {
       // Tablet
       selectButtonWidth = Math.max(140, 170 * uiScale);
@@ -689,7 +689,7 @@ export class CharacterSelectionScene extends Scene {
       selectButtonFontSize = buttonFontSize;
     }
     
-    const buttonY = isMobileLayout ? y + Math.max(50, 65 * uiScale) : y + Math.max(70, 90 * uiScale);
+    const buttonY = isMobileLayout ? y + Math.max(55, 71.5 * uiScale) : y + Math.max(70, 90 * uiScale);
     GraphicsUtils.createRuneScapeButton(
       this,
       x,
@@ -703,9 +703,9 @@ export class CharacterSelectionScene extends Scene {
     
     // Enhanced Delete button with mobile-specific positioning
     const deleteButton = this.add.graphics();
-    const deleteButtonY = isMobileLayout ? buttonY + Math.max(35, 45 * uiScale) : buttonY + Math.max(50, 60 * uiScale);
+    const deleteButtonY = isMobileLayout ? buttonY + Math.max(38.5, 49.5 * uiScale) : buttonY + Math.max(50, 60 * uiScale);
     const deleteText = this.add.text(x, deleteButtonY, 'Delete', {
-      fontSize: isMobileLayout ? `${Math.max(8, 10 * uiScale)}px` : `${ResponsiveLayout.getScaledFontSize(12, screenWidth, screenHeight)}px`,
+      fontSize: isMobileLayout ? `${Math.max(9, 11 * uiScale)}px` : `${ResponsiveLayout.getScaledFontSize(12, screenWidth, screenHeight)}px`,
       color: '#FFD700',
       fontFamily: 'Cinzel, serif',
       stroke: '#000000',
@@ -715,8 +715,8 @@ export class CharacterSelectionScene extends Scene {
     // Responsive delete button dimensions for different screen sizes
     let deleteButtonWidth, deleteButtonHeight;
     if (isMobileLayout) {
-      deleteButtonWidth = Math.max(60, 80 * uiScale);
-      deleteButtonHeight = Math.max(20, 25 * uiScale);
+      deleteButtonWidth = Math.max(66, 88 * uiScale);
+      deleteButtonHeight = Math.max(22, 27.5 * uiScale);
     } else if (screenWidth < 1024) {
       // Tablet
       deleteButtonWidth = Math.max(90, 110 * uiScale);
@@ -817,8 +817,8 @@ export class CharacterSelectionScene extends Scene {
     // Empty slot icon - responsive sizing for different screen sizes
     let iconY, iconFontSize;
     if (isMobileLayout) {
-      iconY = y - Math.max(40, 60 * uiScale);
-      iconFontSize = Math.max(30, 40 * uiScale);
+      iconY = y - Math.max(44, 66 * uiScale);
+      iconFontSize = Math.max(33, 44 * uiScale);
     } else if (screenWidth < 1024) {
       // Tablet
       iconY = y - Math.max(60, 80 * uiScale);
@@ -835,9 +835,9 @@ export class CharacterSelectionScene extends Scene {
     }).setOrigin(0.5);
     
     // Create character text - mobile-specific positioning
-    const textY = isMobileLayout ? y - Math.max(5, 10 * uiScale) : y - Math.max(5, 10 * uiScale);
+    const textY = isMobileLayout ? y - Math.max(5.5, 11 * uiScale) : y - Math.max(5, 10 * uiScale);
     this.add.text(x, textY, 'Create New\nCharacter', {
-      fontSize: isMobileLayout ? `${Math.max(12, fontSize * uiScale)}px` : `${fontSize}px`,
+      fontSize: isMobileLayout ? `${Math.max(13, fontSize * 1.1 * uiScale)}px` : `${fontSize}px`,
       color: '#C0C0C0',
       fontFamily: 'Cinzel, serif',
       align: 'center'
@@ -846,9 +846,9 @@ export class CharacterSelectionScene extends Scene {
     // Create button - responsive dimensions for different screen sizes
     let createButtonWidth, createButtonHeight, createButtonFontSize;
     if (isMobileLayout) {
-      createButtonWidth = Math.max(100, 130 * uiScale);
-      createButtonHeight = Math.max(28, 35 * uiScale);
-      createButtonFontSize = Math.max(10, buttonFontSize * uiScale);
+      createButtonWidth = Math.max(110, 143 * uiScale);
+      createButtonHeight = Math.max(31, 38.5 * uiScale);
+      createButtonFontSize = Math.max(11, buttonFontSize * 1.1 * uiScale);
     } else if (screenWidth < 1024) {
       // Tablet
       createButtonWidth = Math.max(140, 170 * uiScale);
@@ -862,7 +862,7 @@ export class CharacterSelectionScene extends Scene {
       createButtonFontSize = buttonFontSize;
     }
     
-    const buttonY = isMobileLayout ? y + Math.max(50, 65 * uiScale) : y + Math.max(70, 90 * uiScale);
+    const buttonY = isMobileLayout ? y + Math.max(55, 71.5 * uiScale) : y + Math.max(70, 90 * uiScale);
     GraphicsUtils.createRuneScapeButton(
       this,
       x,
@@ -908,8 +908,8 @@ export class CharacterSelectionScene extends Scene {
     
     if (isMobileLayout) {
       // Mobile - touch-friendly dimensions
-      enterButtonWidth = Math.max(200, 240 * uiScale);
-      enterButtonHeight = Math.max(44, buttonFontSize + 16); // Minimum 44px for touch accessibility
+      enterButtonWidth = Math.max(220, 264 * uiScale);
+      enterButtonHeight = Math.max(48, buttonFontSize + 18); // Minimum 48px for touch accessibility - scaled up 10%
     } else if (width < 1024) {
       // Tablet
       enterButtonWidth = Math.max(160, 200 * uiScale);
@@ -956,9 +956,9 @@ export class CharacterSelectionScene extends Scene {
     const separatorY = height * 0.16; // Same Y position as the red line
     
     // Responsive button dimensions - smaller on mobile but still horizontal layout
-    const buttonWidth = isMobileLayout ? Math.max(60, 70 * uiScale) : Math.max(80, 100 * uiScale);
-    const buttonHeight = isMobileLayout ? Math.max(20, 24 * uiScale) : Math.max(24, 28 * uiScale);
-    const horizontalSpacing = isMobileLayout ? Math.max(80, 90 * uiScale) : Math.max(120, 140 * uiScale);
+    const buttonWidth = isMobileLayout ? Math.max(66, 77 * uiScale) : Math.max(80, 100 * uiScale);
+    const buttonHeight = isMobileLayout ? Math.max(22, 26.4 * uiScale) : Math.max(24, 28 * uiScale);
+    const horizontalSpacing = isMobileLayout ? Math.max(88, 99 * uiScale) : Math.max(120, 140 * uiScale);
     
     // Center the three buttons horizontally
     const centerX = width / 2;
@@ -1002,7 +1002,7 @@ export class CharacterSelectionScene extends Scene {
       this,
       logoutX,
       separatorY,
-      isMobileLayout ? Math.max(buttonWidth, 75 * uiScale) : Math.max(buttonWidth, 110 * uiScale),
+      isMobileLayout ? Math.max(buttonWidth, 82.5 * uiScale) : Math.max(buttonWidth, 110 * uiScale),
       buttonHeight,
       '← Logout',
       buttonFontSize,
@@ -1113,8 +1113,8 @@ export class CharacterSelectionScene extends Scene {
     // Mobile-friendly dialog dimensions
     let dialogWidth, dialogHeight;
     if (isMobileLayout) {
-      dialogWidth = Math.min(350, width * 0.95);
-      dialogHeight = Math.min(450, height * 0.9);
+      dialogWidth = Math.min(385, width * 1.045);
+      dialogHeight = Math.min(495, height * 0.99);
     } else if (width < 1024) {
       // Tablet
       dialogWidth = Math.min(500, width * 0.85);
@@ -1140,23 +1140,23 @@ export class CharacterSelectionScene extends Scene {
     
     // Mobile-optimized font sizes
     const titleFontSize = isMobileLayout ? 
-      Math.max(20, 22 * scale) : 
+      Math.max(22, 24.2 * scale) : 
       ResponsiveLayout.getScaledFontSize(24, width, height);
     const nameFontSize = isMobileLayout ? 
-      Math.max(16, 18 * scale) : 
+      Math.max(18, 19.8 * scale) : 
       ResponsiveLayout.getScaledFontSize(20, width, height);
     const warningFontSize = isMobileLayout ? 
-      Math.max(14, 15 * scale) : 
+      Math.max(15, 16.5 * scale) : 
       ResponsiveLayout.getScaledFontSize(16, width, height);
     const detailFontSize = isMobileLayout ? 
-      Math.max(12, 13 * scale) : 
+      Math.max(13, 14.3 * scale) : 
       ResponsiveLayout.getScaledFontSize(14, width, height);
     
     // Calculate responsive positions with mobile-friendly spacing
     const centerY = height / 2;
-    const startY = centerY - dialogHeight / 2 + (isMobileLayout ? 35 : 40);
+    const startY = centerY - dialogHeight / 2 + (isMobileLayout ? 38.5 : 40);
     const lineSpacing = isMobileLayout ? 
-      Math.max(30, 32 * scale) : 
+      Math.max(33, 35.2 * scale) : 
       Math.max(35, 35 * scale);
     
     // Warning title with enhanced styling
@@ -1262,9 +1262,9 @@ export class CharacterSelectionScene extends Scene {
     // Mobile-friendly input dimensions
     let inputWidth, inputHeight, inputFontSize;
     if (isMobile) {
-      inputWidth = Math.min(250, (dimensions?.dialogWidth || 320) * 0.8);
-      inputHeight = Math.max(40, 45 * scale);
-      inputFontSize = Math.max(14, 16 * scale);
+      inputWidth = Math.min(275, (dimensions?.dialogWidth || 352) * 0.88);
+      inputHeight = Math.max(44, 49.5 * scale);
+      inputFontSize = Math.max(15, 17.6 * scale);
     } else {
       const inputDimensions = ResponsiveLayout.getMobileInputDimensions(280, 45, width, height);
       inputWidth = inputDimensions.width;
@@ -1314,11 +1314,11 @@ export class CharacterSelectionScene extends Scene {
     // Mobile-friendly button dimensions and positioning
     let buttonHeight, buttonFontSize, buttonSpacing, buttonY;
     if (isMobile) {
-      buttonHeight = Math.max(35, 40 * scale);
-      buttonFontSize = Math.max(14, 16 * scale);
-      buttonSpacing = 20; // Vertical spacing for mobile
+      buttonHeight = Math.max(38.5, 44 * scale);
+      buttonFontSize = Math.max(15, 17.6 * scale);
+      buttonSpacing = 22; // Vertical spacing for mobile - scaled up 10%
       // Position buttons below input with adequate spacing
-      buttonY = inputYPos + (isMobile ? 70 : 60);
+      buttonY = inputYPos + (isMobile ? 77 : 60);
     } else {
       const buttonDimensions = ResponsiveLayout.getTouchFriendlyButton(120, 45, width, height);
       buttonHeight = buttonDimensions.height;
@@ -1567,11 +1567,11 @@ export class CharacterSelectionScene extends Scene {
     overlay.setDepth(100);
     
     // Enhanced responsive dialog dimensions for new content
-    const baseDialogWidth = isMobile ? 450 : 500;
-    const baseDialogHeight = isMobile ? 280 : 250; // Reduced height to eliminate empty space
+    const baseDialogWidth = isMobile ? 495 : 500;
+    const baseDialogHeight = isMobile ? 308 : 250; // Reduced height to eliminate empty space - scaled up 10%
     // Ensure minimum dialog size even at small scales
-    const dialogWidth = Math.max(350, Math.min(baseDialogWidth * scale, width * 0.95));
-    const dialogHeight = Math.max(240, Math.min(baseDialogHeight * scale, height * 0.8));
+    const dialogWidth = Math.max(385, Math.min(baseDialogWidth * scale, width * 1.045));
+    const dialogHeight = Math.max(264, Math.min(baseDialogHeight * scale, height * 0.88));
     
     // Dialog panel - responsive sizing
     const panel = GraphicsUtils.createUIPanel(
@@ -1627,12 +1627,12 @@ export class CharacterSelectionScene extends Scene {
     
     // Responsive button dimensions - make buttons just big enough for text
     const buttonFontSize = ResponsiveLayout.getButtonFontSize(13, width, height);
-    const createButtonWidth = Math.max(120, 140 * scale);
-    const createButtonHeight = Math.max(24, buttonFontSize + 8);
-    const continueButtonWidth = Math.max(140, 160 * scale);
-    const continueButtonHeight = Math.max(24, buttonFontSize + 8);
-    const buttonY = height / 2 + dialogHeight / 2 - Math.max(35, 40 * scale);
-    const buttonSpacing = isMobile ? Math.max(80, 90 * scale) : Math.max(100, 110 * scale);
+    const createButtonWidth = Math.max(132, 154 * scale);
+    const createButtonHeight = Math.max(26.4, buttonFontSize + 8.8);
+    const continueButtonWidth = Math.max(154, 176 * scale);
+    const continueButtonHeight = Math.max(26.4, buttonFontSize + 8.8);
+    const buttonY = height / 2 + dialogHeight / 2 - Math.max(38.5, 44 * scale);
+    const buttonSpacing = isMobile ? Math.max(88, 99 * scale) : Math.max(100, 110 * scale);
     
     // Create account button - responsive
     const createBtn = GraphicsUtils.createRuneScapeButton(
@@ -1734,8 +1734,8 @@ export class CharacterSelectionScene extends Scene {
     // Mobile-friendly dialog dimensions
     let dialogWidth, dialogHeight;
     if (isMobileLayout) {
-      dialogWidth = Math.min(320, width * 0.95);
-      dialogHeight = Math.min(300, height * 0.8);
+      dialogWidth = Math.min(352, width * 1.045);
+      dialogHeight = Math.min(330, height * 0.88);
     } else if (width < 1024) {
       // Tablet
       dialogWidth = Math.min(450, width * 0.8);
@@ -1761,9 +1761,9 @@ export class CharacterSelectionScene extends Scene {
     
     // Dialog title - mobile-friendly sizing
     const titleFontSize = isMobileLayout ? 
-      Math.max(18, 20 * scale) : 
+      Math.max(20, 22 * scale) : 
       ResponsiveLayout.getScaledFontSize(22, width, height);
-    const titleY = height / 2 - dialogHeight / 2 + (isMobileLayout ? 35 : 40);
+    const titleY = height / 2 - dialogHeight / 2 + (isMobileLayout ? 38.5 : 40);
     const title = this.add.text(width / 2, titleY, 'Guest Account Options', {
       fontSize: `${titleFontSize}px`,
       color: '#8B0000',
@@ -1774,29 +1774,29 @@ export class CharacterSelectionScene extends Scene {
     
     // Dialog message - mobile-optimized
     const messageFontSize = isMobileLayout ? 
-      Math.max(13, 14 * scale) : 
+      Math.max(14, 15.4 * scale) : 
       ResponsiveLayout.getScaledFontSize(15, width, height);
-    const messageY = titleY + (isMobileLayout ? 50 : 45);
+    const messageY = titleY + (isMobileLayout ? 55 : 45);
     const message = this.add.text(width / 2, messageY, 
       'Your guest progress is saved locally.\nWhat would you like to do?', {
       fontSize: `${messageFontSize}px`,
       color: '#F5F5DC',
       fontFamily: 'Cinzel, serif',
       align: 'center',
-      lineSpacing: isMobileLayout ? 5 : 6,
+      lineSpacing: isMobileLayout ? 5.5 : 6,
       wordWrap: { width: dialogWidth - 40 }
     }).setOrigin(0.5).setDepth(202);
     
     // Mobile-friendly button layout
     const buttonFontSize = isMobileLayout ? 
-      Math.max(12, 13 * scale) : 
+      Math.max(13, 14.3 * scale) : 
       ResponsiveLayout.getButtonFontSize(13, width, height);
     
     let buttonWidth, buttonHeight, buttonLayout;
     if (isMobileLayout) {
       // Stack buttons vertically on mobile for better touch targets
-      buttonWidth = Math.max(200, dialogWidth * 0.8);
-      buttonHeight = Math.max(35, buttonFontSize + 12);
+      buttonWidth = Math.max(220, dialogWidth * 0.88);
+      buttonHeight = Math.max(38.5, buttonFontSize + 13.2);
       buttonLayout = 'vertical';
     } else {
       // Horizontal layout for larger screens
@@ -1807,8 +1807,17 @@ export class CharacterSelectionScene extends Scene {
     
     if (buttonLayout === 'vertical') {
       // Mobile: Stack buttons vertically
-      const buttonStartY = messageY + 60;
-      const buttonSpacing = 15;
+      const buttonStartY = messageY + 66;
+      const buttonSpacing = 16.5;
+      
+      // Full logout button - smaller and positioned at bottom (create first so it can be referenced)
+      const logoutBtnY = height / 2 + dialogHeight / 2 - 25;
+      const logoutBtn = this.add.text(width / 2, logoutBtnY, 'Full Logout (Lose Progress)', {
+        fontSize: `${Math.max(11, 12 * scale)}px`,
+        color: '#DC143C',
+        fontFamily: 'Cinzel, serif',
+        align: 'center'
+      }).setOrigin(0.5).setDepth(202).setInteractive({ useHandCursor: true });
       
       // Continue to select button
       const continueBtn = GraphicsUtils.createRuneScapeButton(
@@ -1820,7 +1829,7 @@ export class CharacterSelectionScene extends Scene {
         'Continue to Select',
         buttonFontSize,
         () => {
-          this.closeGuestDialog([overlay, panel, title, message, logoutBtn]);
+          this.closeGuestDialog([overlay, panel, title, message, logoutBtn, continueBtn.background, continueBtn.text, createBtn.background, createBtn.text]);
         }
       );
       continueBtn.background.setDepth(202);
@@ -1836,21 +1845,12 @@ export class CharacterSelectionScene extends Scene {
         'Create Account',
         buttonFontSize,
         () => {
-          this.closeGuestDialog([overlay, panel, title, message, logoutBtn]);
+          this.closeGuestDialog([overlay, panel, title, message, logoutBtn, continueBtn.background, continueBtn.text, createBtn.background, createBtn.text]);
           this.initiateAccountUpgrade();
         }
       );
       createBtn.background.setDepth(202);
       createBtn.text.setDepth(203);
-      
-      // Full logout button - smaller and positioned at bottom
-      const logoutBtnY = height / 2 + dialogHeight / 2 - 25;
-      const logoutBtn = this.add.text(width / 2, logoutBtnY, 'Full Logout (Lose Progress)', {
-        fontSize: `${Math.max(11, 12 * scale)}px`,
-        color: '#DC143C',
-        fontFamily: 'Cinzel, serif',
-        align: 'center'
-      }).setOrigin(0.5).setDepth(202).setInteractive({ useHandCursor: true });
       
       this.addLogoutButtonEffects(logoutBtn, [overlay, panel, title, message, logoutBtn, continueBtn.background, continueBtn.text, createBtn.background, createBtn.text]);
       
