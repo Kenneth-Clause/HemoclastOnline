@@ -39,7 +39,7 @@ export class CharacterCreationScene extends Scene {
     const isActualMobileDevice = ResponsiveLayout.isMobileDevice();
     const isMobileLayout = (isActualMobileDevice || width < 400) && isMobile && mobileAdjustments.isPortrait;
     
-    const titleYOffset = isMobileLayout ? 120 * uiScale : 80 * uiScale; // Move down significantly on mobile
+    const titleYOffset = isMobileLayout ? height * 0.60 : 80 * uiScale; // Position just above red bar on mobile
     const titlePos = ResponsiveLayout.getAnchoredPosition('top-center', 0, titleYOffset, width, height);
     GothicTitleUtils.createDrippingTitle(
       this,
@@ -48,18 +48,24 @@ export class CharacterCreationScene extends Scene {
       'CREATE YOUR',
       'CHAMPION',
       {
-        mainSize: ResponsiveLayout.getScaledFontSize(28, width, height),
-        subSize: ResponsiveLayout.getScaledFontSize(24, width, height),
+        mainSize: isMobileLayout ? 
+          ResponsiveLayout.getScaledFontSize(75, width, height) : // 25% bigger on mobile (28 * 1.25 = 35)
+          ResponsiveLayout.getScaledFontSize(60, width, height),
+        subSize: isMobileLayout ? 
+          ResponsiveLayout.getScaledFontSize(75, width, height) : // 25% bigger on mobile (24 * 1.25 = 30)
+          ResponsiveLayout.getScaledFontSize(60, width, height),
         mainColor: '#8B0000',
         subColor: '#FFD700',
-        spacing: 50 * uiScale,
+        spacing: isMobileLayout ? 120 * uiScale : 50 * uiScale, // Much more spacing on mobile to push CHAMPION down
         drippingEffect: true,
         glowEffect: true
       }
     );
     
-    // Add gothic separator with responsive positioning - moved down for mobile
-    const separatorYOffset = isMobileLayout ? 200 * uiScale : 160 * uiScale;
+    // Add gothic separator with responsive positioning - positioned just above Character Name on mobile
+    const separatorYOffset = isMobileLayout ? 
+      height * 0.85 : // Much closer to Character Name (which is at 28%)
+      160 * uiScale;
     const separatorPos = ResponsiveLayout.getAnchoredPosition('top-center', 0, separatorYOffset, width, height);
     GothicTitleUtils.createGothicSeparator(
       this,
@@ -80,10 +86,7 @@ export class CharacterCreationScene extends Scene {
     // Class selection
     this.createClassSelection();
     
-    // Character preview (desktop only)
-    if (!ResponsiveLayout.isMobileDevice() || width >= 400) {
-      this.createCharacterPreview();
-    }
+    // Character preview removed - not needed
     
     // Action buttons
     this.createActionButtons();
@@ -97,9 +100,16 @@ export class CharacterCreationScene extends Scene {
     const isActualMobileDevice = ResponsiveLayout.isMobileDevice();
     const isMobileLayout = (isActualMobileDevice || width < 400) && isMobile && mobileAdjustments.isPortrait;
     
-    // Name label with responsive positioning - moved down significantly on mobile
-    const labelYOffset = isMobileLayout ? 280 * uiScale : 220 * uiScale;
-    const labelPos = ResponsiveLayout.getAnchoredPosition('top-center', 0, labelYOffset, width, height);
+    // Name label with responsive positioning - positioned above class selection on mobile
+    let labelPos;
+    if (isMobileLayout) {
+      // Mobile: Position above the "Choose Your Path" title
+      labelPos = { x: width / 2, y: height * 0.28 }; // 28% down from top
+    } else {
+      // Desktop: Keep original positioning
+      const labelYOffset = 220 * uiScale;
+      labelPos = ResponsiveLayout.getAnchoredPosition('top-center', 0, labelYOffset, width, height);
+    }
     this.add.text(labelPos.x, labelPos.y, 'Character Name:', {
       fontSize: `${ResponsiveLayout.getScaledFontSize(20, width, height)}px`,
       color: '#F5F5DC',
@@ -128,8 +138,17 @@ export class CharacterCreationScene extends Scene {
     const baseWidth = isMobileLayout ? 280 : 250;
     const baseHeight = isMobileLayout ? 50 : 40;
     const inputDimensions = ResponsiveLayout.getMobileInputDimensions(baseWidth, baseHeight, width, height);
-    const inputYOffset = isMobileLayout ? 320 * uiScale : 260 * uiScale; // Move down significantly on mobile
-    const inputPos = ResponsiveLayout.getAnchoredPosition('top-center', 0, inputYOffset, width, height);
+    
+    // Position input based on mobile vs desktop
+    let inputPos;
+    if (isMobileLayout) {
+      // Mobile: Position below the character name label
+      inputPos = { x: width / 2, y: height * 0.31 }; // 31% down from top
+    } else {
+      // Desktop: Keep original positioning
+      const inputYOffset = 260 * uiScale;
+      inputPos = ResponsiveLayout.getAnchoredPosition('top-center', 0, inputYOffset, width, height);
+    }
     
     // Calculate position as percentage for CSS
     const leftPercent = (inputPos.x / width) * 100;
@@ -197,9 +216,17 @@ export class CharacterCreationScene extends Scene {
     const isActualMobileDevice = ResponsiveLayout.isMobileDevice();
     const isMobileLayout = (isActualMobileDevice || width < 400) && isMobile && mobileAdjustments.isPortrait;
     
-    // Class selection title with responsive positioning - moved down significantly on mobile
-    const titleYOffset = isMobileLayout ? 400 * uiScale : 340 * uiScale;
-    const titlePos = ResponsiveLayout.getAnchoredPosition('top-center', 0, titleYOffset, width, height);
+    // Class selection title with responsive positioning - positioned above class cards
+    let titlePos;
+    if (isMobileLayout) {
+      // Mobile: Position title closer to the class card
+      titlePos = { x: width / 2, y: height * 0.38 }; // 38% down from top, closer to 55% class card
+    } else {
+      // Desktop: Keep original positioning
+      const titleYOffset = 340 * uiScale;
+      titlePos = ResponsiveLayout.getAnchoredPosition('top-center', 0, titleYOffset, width, height);
+    }
+    
     this.add.text(titlePos.x, titlePos.y, 'Choose Your Path:', {
       fontSize: `${ResponsiveLayout.getScaledFontSize(20, width, height)}px`,
       color: '#F5F5DC',
@@ -263,9 +290,9 @@ export class CharacterCreationScene extends Scene {
     
     // Use larger mobile-friendly card dimensions (similar to CharacterSelectionScene)
     const slotWidth = Math.max(240, 300 * uiScale);
-    const slotHeight = Math.max(320, 400 * uiScale);
+    const slotHeight = Math.max(280, 320 * uiScale); // Reduced height to fit better
     const slotX = width / 2;
-    const slotY = startY + 100 * uiScale;
+    const slotY = height * 0.55; // Position below the input field and title (55% down from top)
     
     // Display current class card
     const currentClass = classes[this.currentMobileClassIndex];
@@ -631,9 +658,9 @@ export class CharacterCreationScene extends Scene {
     const isActualMobileDevice = ResponsiveLayout.isMobileDevice();
     const isMobileLayout = (isActualMobileDevice || width < 400) && isMobile && mobileAdjustments.isPortrait;
     
-    // Calculate button dimensions based on text content to prevent wrapping
-    const createFontSize = ResponsiveLayout.getButtonFontSize(isMobileLayout ? 20 : 18, width, height);
-    const backFontSize = ResponsiveLayout.getButtonFontSize(isMobileLayout ? 18 : 16, width, height);
+    // Calculate button dimensions based on text content to prevent wrapping - adjusted mobile font sizes
+    const createFontSize = ResponsiveLayout.getButtonFontSize(isMobileLayout ? 18 : 18, width, height);
+    const backFontSize = ResponsiveLayout.getButtonFontSize(isMobileLayout ? 20 : 16, width, height);
     
     // Create temporary text objects to measure "Create Champion" text
     const tempCreateText = this.add.text(0, 0, 'Create Champion', {
@@ -662,9 +689,9 @@ export class CharacterCreationScene extends Scene {
     const backButtonDims = { width: buttonWidth, height: buttonHeight };
     
     if (isMobileLayout) {
-      // Mobile: Position buttons below class cards (around 80% of screen height)
+      // Mobile: Position buttons below class cards and indicators
       const buttonSpacing = 25 * uiScale;
-      const buttonsY = height * 0.8; // Position below class cards and indicators
+      const buttonsY = height * 0.85; // Position lower to be below class cards and indicators
       
       // Create Champion button
       GothicTitleUtils.createEnhancedGothicButton(
@@ -676,7 +703,7 @@ export class CharacterCreationScene extends Scene {
         'Create Champion',
         () => this.createCharacter(),
         {
-          fontSize: createFontSize,
+          fontSize: isMobileLayout ? 14 : 18, // Same font size for both mobile and desktop
           bgColor: 0x4a0000,
           borderColor: 0x8B0000,
           textColor: '#FFD700',
@@ -698,7 +725,7 @@ export class CharacterCreationScene extends Scene {
         'Back',
         () => this.goBack(),
         {
-          fontSize: backFontSize,
+          fontSize: isMobileLayout ? 20 : 16, // Moderately larger font on mobile
           bgColor: 0x2d1b1b,
           borderColor: 0x666666,
           textColor: '#F5F5DC',
@@ -724,7 +751,7 @@ export class CharacterCreationScene extends Scene {
         'Create Champion',
         () => this.createCharacter(),
         {
-          fontSize: ResponsiveLayout.getButtonFontSize(18, width, height),
+          fontSize: 18, // Keep original desktop font size
           bgColor: 0x4a0000,
           borderColor: 0x8B0000,
           textColor: '#FFD700',
@@ -746,7 +773,7 @@ export class CharacterCreationScene extends Scene {
         'Back',
         () => this.goBack(),
         {
-          fontSize: ResponsiveLayout.getButtonFontSize(16, width, height),
+          fontSize: 16, // Keep original desktop font size
           bgColor: 0x2d1b1b,
           borderColor: 0x666666,
           textColor: '#F5F5DC',
