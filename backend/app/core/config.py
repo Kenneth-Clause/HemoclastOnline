@@ -10,13 +10,16 @@ class Settings(BaseSettings):
     """Application settings"""
     
     # Database
-    DATABASE_URL: str = "postgresql+asyncpg://hemoclast:hemoclast@localhost:5432/hemoclast_db"
+    DATABASE_URL: str = os.getenv(
+        "DATABASE_URL", 
+        "postgresql+asyncpg://hemoclast:hemoclast@localhost:5432/hemoclast_db"
+    )
     
     # Redis
-    REDIS_URL: str = "redis://localhost:6379"
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379")
     
     # Security
-    SECRET_KEY: str = "your-secret-key-change-in-production"
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "fallback-key-for-dev-only")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
@@ -26,6 +29,14 @@ class Settings(BaseSettings):
         "http://localhost:5173",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173"
+    ]
+    ALLOWED_METHODS: List[str] = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    ALLOWED_HEADERS: List[str] = [
+        "Accept",
+        "Accept-Language", 
+        "Content-Language",
+        "Content-Type",
+        "Authorization"
     ]
     
     # Game Settings

@@ -14,6 +14,11 @@ services:
       - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - hemoclast_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hemoclast -d hemoclast_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   # Redis Cache
   redis:
@@ -35,14 +40,16 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://hemoclast:hemoclast@postgres:5432/hemoclast_db
       REDIS_URL: redis://redis:6379
-      SECRET_KEY: your-secret-key-change-in-production
+      SECRET_KEY: ${SECRET_KEY:-KmUqufoZ433itTJt4anRHRjAUxkcx3xKN58KfaAZQ88}
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     networks:
       - hemoclast_network
     restart: unless-stopped

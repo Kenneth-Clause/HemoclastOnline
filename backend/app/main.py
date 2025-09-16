@@ -3,8 +3,11 @@ HemoclastOnline FastAPI Backend
 Main application entry point
 """
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from contextlib import asynccontextmanager
 import redis.asyncio as redis
 import logging
@@ -12,9 +15,13 @@ import json
 import time
 
 from app.core.config import settings
-from app.core.database import engine, Base
+from app.core.database import engine, Base, async_session
 from app.api.v1 import api_router
 from app.websocket.connection_manager import ConnectionManager
+from app.models.player import Player
+from app.models.guest_session import GuestSession
+from jose import JWTError, jwt
+from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
 
@@ -47,14 +54,44 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=settings.ALLOWED_METHODS,
+    allow_headers=settings.ALLOWED_HEADERS,
 )
+
+# Security headers middleware
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+    
+    # Security headers
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    
+    # CSP for development (adjust for production)
+    if settings.ENVIRONMENT == "development":
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: https:; "
+            "connect-src 'self' ws: wss:; "
+            "font-src 'self' https://fonts.gstatic.com;"
+        )
+    
+    return response
 
 # Include API routes
 app.include_router(api_router, prefix="/api/v1")
@@ -65,8 +102,55 @@ async def health_check():
     return {"status": "healthy", "service": "hemoclast-backend"}
 
 @app.websocket("/ws/{client_id}")
-async def websocket_endpoint(websocket: WebSocket, client_id: str):
-    """WebSocket endpoint for real-time communication"""
+async def websocket_endpoint(websocket: WebSocket, client_id: str, token: str = Query(...)):
+    """WebSocket endpoint with JWT authentication"""
+    # Verify JWT token before accepting connection
+    user = None
+    try:
+        # Check if it's a guest session token first
+        if token.startswith("guest_"):
+            async with async_session() as db:
+                result = await db.execute(
+                    select(GuestSession).where(
+                        GuestSession.session_token == token,
+                        GuestSession.is_active == True
+                    )
+                )
+                guest_session = result.scalar_one_or_none()
+                
+                if guest_session:
+                    # Get the associated player
+                    result = await db.execute(select(Player).where(Player.id == guest_session.player_id))
+                    user = result.scalar_one_or_none()
+                    
+                if not user:
+                    await websocket.close(code=1008, reason="Invalid guest token")
+                    return
+        else:
+            # Handle JWT tokens for registered users
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+            username = payload.get("sub")
+            if not username:
+                await websocket.close(code=1008, reason="Invalid token")
+                return
+                
+            # Verify user exists in database
+            async with async_session() as db:
+                result = await db.execute(select(Player).where(Player.name == username))
+                user = result.scalar_one_or_none()
+                if not user:
+                    await websocket.close(code=1008, reason="User not found")
+                    return
+                    
+    except JWTError:
+        await websocket.close(code=1008, reason="Invalid token")
+        return
+    except Exception as e:
+        logger.error(f"WebSocket auth error: {e}")
+        await websocket.close(code=1011, reason="Authentication error")
+        return
+    
+    # Continue with existing connection logic
     await connection_manager.connect(websocket, client_id)
     try:
         while True:

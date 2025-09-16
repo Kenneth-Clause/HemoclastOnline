@@ -5,7 +5,7 @@ Character management endpoints
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, validator
 from app.core.database import get_db
 from app.models.character import Character, CharacterClass
 from app.api.v1.endpoints.auth import get_current_user
@@ -14,8 +14,22 @@ from app.models.player import Player
 router = APIRouter()
 
 class CharacterCreateRequest(BaseModel):
-    name: str
+    name: str = Field(..., min_length=3, max_length=20)
     character_class: CharacterClass
+    
+    @validator('name')
+    def validate_name(cls, v):
+        if not v.strip():
+            raise ValueError('Character name cannot be empty')
+        if len(v.strip()) < 3:
+            raise ValueError('Character name must be at least 3 characters')
+        if len(v.strip()) > 20:
+            raise ValueError('Character name must be less than 20 characters')
+        # Check for valid characters
+        import re
+        if not re.match(r'^[a-zA-Z0-9_\-]+$', v.strip()):
+            raise ValueError('Character name can only contain letters, numbers, underscores, and hyphens')
+        return v.strip()
 
 @router.get("/{character_id}")
 async def get_character(character_id: int, db: AsyncSession = Depends(get_db)):

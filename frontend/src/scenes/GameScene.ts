@@ -410,7 +410,14 @@ export class GameScene extends Scene {
         host = window.location.hostname + ':8000';
       }
       
-      const wsUrl = `${protocol}//${host}/ws/${clientId}`;
+      // Get authentication token
+      const token = localStorage.getItem('hemoclast_token');
+      if (!token) {
+        console.error('No authentication token found for WebSocket connection');
+        return;
+      }
+      
+      const wsUrl = `${protocol}//${host}/ws/${clientId}?token=${encodeURIComponent(token)}`;
       
       console.log('Connecting to multiplayer server:', wsUrl);
       

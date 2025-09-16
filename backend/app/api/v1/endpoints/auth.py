@@ -2,11 +2,13 @@
 Authentication endpoints
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, validator
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
@@ -17,14 +19,33 @@ from app.models.guest_session import GuestSession
 
 router = APIRouter()
 security = HTTPBearer(auto_error=False)
+limiter = Limiter(key_func=get_remote_address)
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class UserRegister(BaseModel):
-    username: str
+    username: str = Field(..., min_length=3, max_length=20)
     email: EmailStr
-    password: str
+    password: str = Field(..., min_length=6, max_length=128)
+    
+    @validator('username')
+    def validate_username(cls, v):
+        if not v.strip():
+            raise ValueError('Username cannot be empty')
+        # Check for valid characters
+        import re
+        if not re.match(r'^[a-zA-Z0-9_]+$', v.strip()):
+            raise ValueError('Username can only contain letters, numbers, and underscores')
+        return v.strip().lower()
+    
+    @validator('password')
+    def validate_password(cls, v):
+        if len(v) < 6:
+            raise ValueError('Password must be at least 6 characters')
+        if len(v) > 128:
+            raise ValueError('Password too long')
+        return v
 
 class UserLogin(BaseModel):
     username: str
@@ -112,7 +133,8 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     return user
 
 @router.post("/guest", response_model=GuestToken)
-async def create_guest_account(db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/minute")
+async def create_guest_account(request: Request, db: AsyncSession = Depends(get_db)):
     """Create a guest account with persistent session token"""
     import uuid
     
@@ -195,7 +217,8 @@ async def convert_guest_to_registered(
     }
 
 @router.post("/register", response_model=Token)
-async def register_user(user: UserRegister, db: AsyncSession = Depends(get_db)):
+@limiter.limit("3/minute")
+async def register_user(request: Request, user: UserRegister, db: AsyncSession = Depends(get_db)):
     """Register a new user account"""
     # Check if username already exists
     result = await db.execute(select(Player).where(Player.name == user.username))
@@ -233,7 +256,8 @@ async def register_user(user: UserRegister, db: AsyncSession = Depends(get_db)):
     }
 
 @router.post("/login", response_model=Token)
-async def login_user(user: UserLogin, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute")
+async def login_user(request: Request, user: UserLogin, db: AsyncSession = Depends(get_db)):
     """Login with username and password"""
     # Find user by username
     result = await db.execute(select(Player).where(Player.name == user.username))
