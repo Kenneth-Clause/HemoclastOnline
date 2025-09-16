@@ -65,9 +65,9 @@ export class CharacterCreationScene extends Scene {
     // Add gothic separator with responsive positioning - positioned just above Character Name on mobile
     const separatorYOffset = isMobileLayout ? 
       height * 0.85 : // Much closer to Character Name (which is at 28%)
-      160 * uiScale;
+      200 * uiScale; // Moved down for desktop
     const separatorPos = ResponsiveLayout.getAnchoredPosition('top-center', 0, separatorYOffset, width, height);
-    GothicTitleUtils.createGothicSeparator(
+    const separator = GothicTitleUtils.createGothicSeparator(
       this,
       separatorPos.x,
       separatorPos.y,
@@ -79,6 +79,17 @@ export class CharacterCreationScene extends Scene {
         ornaments: true
       }
     );
+    // Set separator depth behind title for desktop
+    if (!isMobileLayout && separator) {
+      separator.setDepth(-1);
+      // Also set depth for any ornament text objects that were just created
+      const recentObjects = this.children.list.slice(-4); // Get the last 4 objects (graphics + 3 ornaments)
+      recentObjects.forEach(obj => {
+        if (obj.type === 'Text') {
+          obj.setDepth(-1);
+        }
+      });
+    }
     
     // Character name input
     this.createNameInput();
@@ -222,8 +233,8 @@ export class CharacterCreationScene extends Scene {
       // Mobile: Position title closer to the class card
       titlePos = { x: width / 2, y: height * 0.38 }; // 38% down from top, closer to 55% class card
     } else {
-      // Desktop: Keep original positioning
-      const titleYOffset = 340 * uiScale;
+      // Desktop: Move further down
+      const titleYOffset = 420 * uiScale; // Moved down from 340
       titlePos = ResponsiveLayout.getAnchoredPosition('top-center', 0, titleYOffset, width, height);
     }
     
@@ -265,18 +276,18 @@ export class CharacterCreationScene extends Scene {
       // Mobile: Use CharacterSelectionScene approach with navigation
       this.createMobileClassNavigation(classes, titlePos.y + 60 * uiScale, width, height);
     } else {
-      // Desktop: Keep horizontal layout
-      const baseSlotWidth = 180;
-      const slotWidth = Math.max(140, baseSlotWidth * uiScale);
-      const slotSpacing = Math.max(10, 20 * uiScale);
+      // Desktop: Keep horizontal layout with even bigger cards
+      const baseSlotWidth = 280; // Increased from 240
+      const slotWidth = Math.max(240, baseSlotWidth * uiScale); // Increased minimum from 200
+      const slotSpacing = Math.max(20, 30 * uiScale); // Increased spacing
       
       const totalWidth = classes.length * slotWidth + (classes.length - 1) * slotSpacing;
       const startX = width / 2 - totalWidth / 2 + slotWidth / 2;
-      const y = titlePos.y + 120 * uiScale;
+      const y = titlePos.y + 220 * uiScale; // Moved down even further from 180
       
       classes.forEach((classData, index) => {
         const x = startX + index * (slotWidth + slotSpacing);
-        const slotHeight = Math.max(180, 200 * uiScale);
+        const slotHeight = Math.max(300, 340 * uiScale); // Even bigger from 250/280
         
         this.createClassSlot(x, y, classData, slotWidth, slotHeight, width, height);
       });
@@ -737,14 +748,14 @@ export class CharacterCreationScene extends Scene {
         }
       );
     } else {
-      // Desktop: Keep original horizontal layout at bottom
-      const buttonsY = ResponsiveLayout.getAnchoredPosition('bottom-center', 0, 100 * uiScale, width, height).y;
-      const buttonSpacing = Math.max(40, 80 * uiScale);
+      // Desktop: Stack buttons vertically and move them up
+      const buttonsY = ResponsiveLayout.getAnchoredPosition('bottom-center', 0, 160 * uiScale, width, height).y; // Moved up from 80
+      const buttonSpacing = 25 * uiScale; // Vertical spacing between buttons
       
-      // Create character button
+      // Create character button (top button)
       GothicTitleUtils.createEnhancedGothicButton(
         this,
-        width / 2 - buttonSpacing,
+        width / 2,
         buttonsY,
         createButtonDims.width,
         createButtonDims.height,
@@ -763,11 +774,11 @@ export class CharacterCreationScene extends Scene {
         }
       );
       
-      // Back button
+      // Back button (bottom button)
       GothicTitleUtils.createEnhancedGothicButton(
         this,
-        width / 2 + buttonSpacing,
-        buttonsY,
+        width / 2,
+        buttonsY + createButtonDims.height + buttonSpacing,
         backButtonDims.width,
         backButtonDims.height,
         'Back',
