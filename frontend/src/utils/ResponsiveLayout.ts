@@ -115,9 +115,10 @@ export class ResponsiveLayout {
       // True mobile device with small screen
       const mobileAdjustments = this.getMobileAdjustments(currentWidth, currentHeight);
       
+      // Much more conservative mobile width for better mobile display
       const mobileWidth = Math.min(
-        Math.max(280, currentWidth * 0.75), // 75% of screen width, minimum 280px
-        400 // Maximum 400px even on large mobile screens
+        Math.max(150, currentWidth * 0.39), 
+        230
       );
       
       const mobileHeight = Math.max(

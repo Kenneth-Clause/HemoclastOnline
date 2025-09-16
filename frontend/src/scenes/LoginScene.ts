@@ -358,23 +358,39 @@ export class LoginScene extends Scene {
     const centerX = width / 2;
     const centerY = height / 2;
     const formCenterY = centerY + 10; // Match the form positioning
+    const isMobile = ResponsiveLayout.isMobile(width, height);
     
-    // Get UI scale for responsive button sizing (used in touch button calculation)
+    // Button text based on mode
+    const buttonTextContent = this.currentMode === 'login' ? 'Sign In' : 'Create Account';
+    const fontSize = ResponsiveLayout.getButtonFontSize(16, width, height);
     
-    // Main action button (Login/Register) - positioned based on form type with mobile-optimized sizing
+    // Create temporary text to measure dimensions
+    const tempText = this.add.text(0, 0, buttonTextContent, {
+      fontSize: `${fontSize}px`,
+      fontFamily: 'Cinzel, serif',
+    });
+    
+    // Calculate required button dimensions based on text content
+    const textPadding = isMobile ? 40 : 32; // More padding on mobile
+    const requiredWidth = tempText.width + textPadding;
+    const requiredHeight = Math.max(tempText.height + 20, isMobile ? 50 : 44); // Minimum touch-friendly height
+    
+    // Clean up temporary text
+    tempText.destroy();
+    
+    // Use touch-friendly button dimensions but ensure it fits content
     const touchButton = ResponsiveLayout.getTouchFriendlyButton(200, 50, width, height);
-    const buttonWidth = touchButton.width;
-    const buttonHeight = touchButton.height;
-    const buttonY = this.currentMode === 'register' ? formCenterY + 132 : formCenterY + 92; // Moved down 2px
+    const buttonWidth = Math.max(touchButton.width, requiredWidth);
+    const buttonHeight = Math.max(touchButton.height, requiredHeight);
+    const buttonY = this.currentMode === 'register' ? formCenterY + 132 : formCenterY + 92;
     
     const buttonBg = this.add.rectangle(centerX, buttonY, buttonWidth, buttonHeight, 0x2d1b1b)
       .setStrokeStyle(2, 0x8B0000)
       .setInteractive();
     this.sceneElements.push(buttonBg);
     
-    const buttonText = this.add.text(centerX, buttonY, 
-      this.currentMode === 'login' ? 'Sign In' : 'Create Account', {
-      fontSize: `${ResponsiveLayout.getButtonFontSize(16, width, height)}px`,
+    const buttonText = this.add.text(centerX, buttonY, buttonTextContent, {
+      fontSize: `${fontSize}px`,
       color: '#F5F5DC',
       fontFamily: 'Cinzel, serif',
       stroke: '#000000',
@@ -421,8 +437,8 @@ export class LoginScene extends Scene {
       this.createRegistrationModeButtons(centerX, centerY);
     }
     
-    // Add Settings and Credits buttons to bottom left (for both modes)
-    this.createBottomLeftButtons();
+    // Add sound toggle button to bottom left (for both modes)
+    this.createSoundToggleButton();
   }
 
   private createLoginModeButtons(centerX: number, centerY: number) {
@@ -480,47 +496,76 @@ export class LoginScene extends Scene {
     );
   }
 
-  private createBottomLeftButtons() {
+  private createSoundToggleButton() {
     const { width, height } = this.scale;
-    const buttonX = 100;
-    const buttonSpacing = 45;
-    const bottomMargin = 30;
+    const isMobile = ResponsiveLayout.isMobile(width, height);
     
-    // Use responsive button font scaling
-    const buttonFontSize = ResponsiveLayout.getButtonFontSize(14, width, height);
+    // Position in bottom left corner with responsive sizing
+    const buttonSize = isMobile ? 50 : 40;
+    const margin = isMobile ? 25 : 20;
+    const buttonX = margin + buttonSize / 2;
+    const buttonY = height - margin - buttonSize / 2;
     
-    // Stack buttons vertically in bottom left corner
-    const creditsY = height - bottomMargin;
-    const settingsY = creditsY - buttonSpacing;
+    // Get current sound state from localStorage (default to enabled)
+    const isSoundEnabled = localStorage.getItem('hemoclast_sound_enabled') !== 'false';
     
-    // Credits button (bottom)
-    const creditsButton = GraphicsUtils.createRuneScapeButton(
-      this,
-      buttonX,
-      creditsY,
-      100,
-      35,
-      'Credits',
-      buttonFontSize,
-      () => this.goToCredits()
-    );
-    this.sceneElements.push(creditsButton.background);
-    this.sceneElements.push(creditsButton.text);
+    // Create circular button background
+    const buttonBg = this.add.circle(buttonX, buttonY, buttonSize / 2, 0x2d1b1b)
+      .setStrokeStyle(2, 0x8B0000)
+      .setInteractive();
+    this.sceneElements.push(buttonBg);
     
-    // Settings button (top)
-    const settingsButton = GraphicsUtils.createRuneScapeButton(
-      this,
-      buttonX,
-      settingsY,
-      100,
-      35,
-      'Settings',
-      buttonFontSize,
-      () => this.goToSettings()
-    );
-    this.sceneElements.push(settingsButton.background);
-    this.sceneElements.push(settingsButton.text);
+    // Sound icon (🔊 for enabled, 🔇 for disabled)
+    const soundIcon = this.add.text(buttonX, buttonY, isSoundEnabled ? '🔊' : '🔇', {
+      fontSize: `${ResponsiveLayout.getButtonFontSize(isMobile ? 24 : 20, width, height)}px`,
+      color: '#F5F5DC'
+    }).setOrigin(0.5);
+    this.sceneElements.push(soundIcon);
+    
+    // Button hover effects
+    buttonBg.on('pointerover', () => {
+      if (buttonBg && buttonBg.active) {
+        buttonBg.setFillStyle(0x4a0000);
+        buttonBg.setStrokeStyle(2, 0xDC143C);
+      }
+      if (soundIcon && soundIcon.active) {
+        soundIcon.setScale(1.1);
+      }
+    });
+    
+    buttonBg.on('pointerout', () => {
+      if (buttonBg && buttonBg.active) {
+        buttonBg.setFillStyle(0x2d1b1b);
+        buttonBg.setStrokeStyle(2, 0x8B0000);
+      }
+      if (soundIcon && soundIcon.active) {
+        soundIcon.setScale(1.0);
+      }
+    });
+    
+    // Toggle sound on click
+    buttonBg.on('pointerdown', () => {
+      const currentState = localStorage.getItem('hemoclast_sound_enabled') !== 'false';
+      const newState = !currentState;
+      
+      // Update localStorage
+      localStorage.setItem('hemoclast_sound_enabled', newState.toString());
+      
+      // Update icon
+      if (soundIcon && soundIcon.active) {
+        soundIcon.setText(newState ? '🔊' : '🔇');
+      }
+      
+      // TODO: Actually toggle game sound/music here
+      // For now, just show a brief notification
+      this.notificationManager.info(
+        newState ? 'Sound enabled' : 'Sound disabled',
+        'Audio',
+        1500
+      );
+    });
   }
+
 
   private createActionButton(
     x: number, 
@@ -534,11 +579,29 @@ export class LoginScene extends Scene {
     textColor: string = '#F5F5DC'
   ) {
     const { width: screenWidth, height: screenHeight } = this.scale;
+    const isMobile = ResponsiveLayout.isMobile(screenWidth, screenHeight);
     
-    // Use touch-friendly button dimensions for mobile optimization
+    // Calculate text dimensions to ensure button fits content
+    const fontSize = ResponsiveLayout.getButtonFontSize(16, screenWidth, screenHeight);
+    
+    // Create temporary text object to measure dimensions
+    const tempText = this.add.text(0, 0, text, {
+      fontSize: `${fontSize}px`,
+      fontFamily: 'Cinzel, serif',
+    });
+    
+    // Calculate required button dimensions based on text content
+    const textPadding = isMobile ? 40 : 32; // More padding on mobile
+    const requiredWidth = tempText.width + textPadding;
+    const requiredHeight = Math.max(tempText.height + 20, isMobile ? 50 : 44); // Minimum touch-friendly height
+    
+    // Clean up temporary text object
+    tempText.destroy();
+    
+    // Use touch-friendly button dimensions but ensure it fits content
     const touchButton = ResponsiveLayout.getTouchFriendlyButton(baseWidth, baseHeight, screenWidth, screenHeight);
-    const width = touchButton.width;
-    const height = touchButton.height;
+    const width = Math.max(touchButton.width, requiredWidth);
+    const height = Math.max(touchButton.height, requiredHeight);
     
     const buttonBg = this.add.rectangle(x, y, width, height, bgColor)
       .setStrokeStyle(2, borderColor)
@@ -546,7 +609,7 @@ export class LoginScene extends Scene {
     this.sceneElements.push(buttonBg);
     
     const buttonText = this.add.text(x, y, text, {
-      fontSize: `${ResponsiveLayout.getButtonFontSize(16, screenWidth, screenHeight)}px`,
+      fontSize: `${fontSize}px`,
       color: textColor,
       fontFamily: 'Cinzel, serif',
       stroke: '#000000',
@@ -600,20 +663,49 @@ export class LoginScene extends Scene {
     textColor: string = '#F5F5DC'
   ) {
     const { width: screenWidth, height: screenHeight } = this.scale;
+    const isMobile = ResponsiveLayout.isMobile(screenWidth, screenHeight);
     
-    // Use touch-friendly button dimensions for mobile optimization
+    // Calculate text dimensions to ensure button fits content
+    const topFontSize = ResponsiveLayout.getButtonFontSize(16, screenWidth, screenHeight);
+    const bottomFontSize = ResponsiveLayout.getButtonFontSize(14, screenWidth, screenHeight);
+    
+    // Create temporary text objects to measure dimensions
+    const tempTopText = this.add.text(0, 0, topText, {
+      fontSize: `${topFontSize}px`,
+      fontFamily: 'Cinzel, serif',
+    });
+    const tempBottomText = this.add.text(0, 0, bottomText, {
+      fontSize: `${bottomFontSize}px`,
+      fontFamily: 'Cinzel, serif',
+      fontStyle: 'italic'
+    });
+    
+    // Calculate required button dimensions based on text content
+    const textPadding = isMobile ? 24 : 16; // More padding on mobile
+    const lineSpacing = isMobile ? 6 : 4; // More line spacing on mobile
+    const requiredWidth = Math.max(tempTopText.width, tempBottomText.width) + textPadding;
+    const requiredHeight = tempTopText.height + tempBottomText.height + lineSpacing + (textPadding / 2);
+    
+    // Clean up temporary text objects
+    tempTopText.destroy();
+    tempBottomText.destroy();
+    
+    // Use touch-friendly button dimensions but ensure it fits content
     const touchButton = ResponsiveLayout.getTouchFriendlyButton(baseWidth, baseHeight, screenWidth, screenHeight);
-    const width = touchButton.width;
-    const height = touchButton.height;
+    const width = Math.max(touchButton.width, requiredWidth);
+    const height = Math.max(touchButton.height, requiredHeight);
     
     const buttonBg = this.add.rectangle(x, y, width, height, bgColor)
       .setStrokeStyle(2, borderColor)
       .setInteractive();
     this.sceneElements.push(buttonBg);
     
+    // Position text lines with proper spacing
+    const textOffsetY = lineSpacing / 2;
+    
     // Top text line
-    const topButtonText = this.add.text(x, y - 10, topText, {
-      fontSize: `${ResponsiveLayout.getButtonFontSize(16, screenWidth, screenHeight)}px`,
+    const topButtonText = this.add.text(x, y - textOffsetY - 2, topText, {
+      fontSize: `${topFontSize}px`,
       color: textColor,
       fontFamily: 'Cinzel, serif',
       stroke: '#000000',
@@ -622,8 +714,8 @@ export class LoginScene extends Scene {
     this.sceneElements.push(topButtonText);
     
     // Bottom text line (username)
-    const bottomButtonText = this.add.text(x, y + 12, bottomText, {
-      fontSize: `${ResponsiveLayout.getButtonFontSize(14, screenWidth, screenHeight)}px`,
+    const bottomButtonText = this.add.text(x, y + textOffsetY + 8, bottomText, {
+      fontSize: `${bottomFontSize}px`,
       color: textColor,
       fontFamily: 'Cinzel, serif',
       fontStyle: 'italic',
@@ -934,44 +1026,40 @@ export class LoginScene extends Scene {
     this.handleAuthSuccess(guestData);
   }
 
-
-  private goToSettings() {
-    this.gameStore.store.getState().setScene('SettingsScene');
-    this.cleanupForm();
-    this.scene.start('SettingsScene');
-  }
-  
-  private goToCredits() {
-    this.gameStore.store.getState().setScene('CreditsScene');
-    this.cleanupForm();
-    this.scene.start('CreditsScene');
-  }
-
   private showUpgradeIndicator() {
     const isUpgrading = localStorage.getItem('hemoclast_upgrading_guest') === 'true';
     
     if (isUpgrading) {
-      const { width } = this.scale;
+      const { width, height } = this.scale;
+      const isMobile = ResponsiveLayout.isMobile(width, height);
       
-      // Show upgrade banner at the top
+      // Mobile-optimized positioning - place below title but well above form
+      const bannerY = isMobile ? height * 0.28 : height * 0.22; // Higher position to clear sign-in form
+      const bannerWidth = Math.min(width * 0.9, 600); // Responsive width, max 600px
+      const bannerHeight = isMobile ? 60 : 50; // Taller on mobile for better visibility
+      
+      // Show upgrade banner positioned to not cover title
       const banner = GraphicsUtils.createUIPanel(
         this,
-        width / 2 - 300,
-        30,
-        600,
-        50,
+        width / 2 - bannerWidth / 2,
+        bannerY - bannerHeight / 2,
+        bannerWidth,
+        bannerHeight,
         0x4a0000,
         0xFFD700,
         2
       );
       this.sceneElements.push(banner);
       
-      // Upgrade message
-      const upgradeText = this.add.text(width / 2, 55, 
+      // Upgrade message with responsive font size
+      const fontSize = ResponsiveLayout.getScaledFontSize(16, width, height);
+      const upgradeText = this.add.text(width / 2, bannerY, 
         '🔄 Upgrading Guest Account - Your characters will be preserved!', {
-        fontSize: '16px',
+        fontSize: `${fontSize}px`,
         color: '#FFD700',
-        fontFamily: 'Cinzel, serif'
+        fontFamily: 'Cinzel, serif',
+        wordWrap: { width: bannerWidth - 20, useAdvancedWrap: true },
+        align: 'center'
       }).setOrigin(0.5);
       this.sceneElements.push(upgradeText);
       
