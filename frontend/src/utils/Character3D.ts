@@ -43,7 +43,6 @@ export class Character3D {
   private isMoving = false;
   private movementDirection = new THREE.Vector3();
   private targetPosition: THREE.Vector3 | null = null;
-  private moveStartTime: number = 0; // Track when movement started
   
   // References
   private scene: THREE.Scene;
@@ -55,10 +54,17 @@ export class Character3D {
   // Terrain following
   private raycaster: THREE.Raycaster = new THREE.Raycaster();
   private terrainMesh: THREE.Mesh | null = null;
+  
+  // Initialization state
+  public isFullyInitialized: boolean = false;
 
   constructor(config: Character3DConfig) {
     const debugConsole = DebugConsole.getInstance();
     debugConsole.addLog('WARN', ['🚨 CHARACTER3D SIMPLIFIED VERSION 4.0 - Direct GLTF Loading 🚨']);
+    
+    // Debug flag for Game3DScene
+    (window as any).CHARACTER3D_CONSTRUCTOR_CALLED = true;
+    console.log('🎬 CHARACTER3D: Constructor called successfully');
     
     // Store references
     this.scene = config.scene;
@@ -81,7 +87,13 @@ export class Character3D {
     // Create physics body
     this.createPhysicsBody(config.position);
     
+    // Ensure character starts in proper idle state
+    this.targetPosition = null;
+    this.isMoving = false;
+    this.movementDirection.set(0, 0, 0);
+    
     console.log(`✅ Character3D simplified constructor completed for ${this.name}`);
+    console.log(`🎬 CHARACTER3D: Constructor finished - methods should be available`);
   }
   
   private async loadCharacter(config: Character3DConfig): Promise<void> {
@@ -187,7 +199,7 @@ export class Character3D {
     });
     this.nameplate = new THREE.Sprite(material);
     this.nameplate.position.y = 3.5; // Closer to character
-    this.nameplate.scale.set(2.75, 1.15, 1); // Just a bit bigger for better visibility
+    this.nameplate.scale.set(3.5, 1.15, 1); // Just a bit bigger for better visibility
     
     this.group.add(this.nameplate);
     console.log(`🏷️ Created enhanced nameplate for ${cleanName}`);
@@ -237,11 +249,15 @@ export class Character3D {
     );
     
     if (idleClip) {
-      this.currentAction = this.mixer.clipAction(idleClip);
+      console.log(`🎭 CONSERVATIVE: Starting gentle idle animation setup for ${idleClip.name}`);
       
-      // NUCLEAR ANIMATION APPROACH: Stop all other actions first
+      // CONSERVATIVE APPROACH: Gentle animation setup
       this.mixer.stopAllAction();
       
+      // Create action normally
+      this.currentAction = this.mixer.clipAction(idleClip);
+      
+      // Standard setup
       this.currentAction.reset();
       this.currentAction.setEffectiveWeight(1.0);
       this.currentAction.setEffectiveTimeScale(1.0);
@@ -251,21 +267,39 @@ export class Character3D {
       this.currentAction.play();
       
       this.animationState = 'idle';
-      console.log(`🎭 NUCLEAR: Started idle animation: ${idleClip.name}`);
+      console.log(`🎭 CONSERVATIVE: Started idle animation: ${idleClip.name}`);
       
-      // SUPER AGGRESSIVE: Force many animation updates
-      for (let i = 0; i < 10; i++) {
+      // Gentle animation updates - just enough to override bind pose
+      for (let i = 0; i < 8; i++) {
         this.mixer.update(0.033);
       }
       
-      console.log(`🎭 NUCLEAR: Forced 10 animation updates to override any default pose`);
+      console.log(`🎭 CONSERVATIVE: Applied 8 gentle animation updates`);
       
-      // ALSO call our standard playAnimation method to ensure proper setup
+      // Call standard playAnimation method once
       this.playAnimation('idle');
+      
+      // Additional gentle updates after playAnimation call
+      for (let i = 0; i < 3; i++) {
+        this.mixer.update(0.033);
+      }
+      
+      console.log(`🎭 CONSERVATIVE: Animation initialization complete - should be standing normally`);
+      
+      // Mark as fully initialized after reasonable delay
+      setTimeout(() => {
+        this.isFullyInitialized = true;
+        console.log(`✅ Character ${this.name} fully initialized and ready - Animation state: ${this.animationState}`);
+      }, 300); // Short delay
       
     } else {
       console.error(`❌ CRITICAL: No idle animation found!`);
       this.animations.forEach(clip => console.error(`Available: ${clip.name}`));
+      
+      // Even without animations, mark as initialized
+      setTimeout(() => {
+        this.isFullyInitialized = true;
+      }, 300);
     }
   }
   
@@ -277,7 +311,12 @@ export class Character3D {
     // Cancel click-to-move if keyboard input
     if (this.isMoving && this.targetPosition) {
       this.targetPosition = null;
-      console.log('🎮 Cancelled click-to-move due to keyboard input');
+    }
+    
+    // CRITICAL: When WASD stops, ensure ALL movement states are cleared
+    if (!this.isMoving && wasMoving) {
+      this.targetPosition = null; // Clear any lingering click-to-move
+      this.movementDirection.set(0, 0, 0); // Ensure direction is zero
     }
     
     // Face movement direction smoothly
@@ -296,23 +335,8 @@ export class Character3D {
   
   public moveToPosition(targetPosition: THREE.Vector3): void {
     this.targetPosition = targetPosition.clone();
-    
-    // Use terrain height instead of fixed Y value
-    const terrainHeight = this.getTerrainHeight(targetPosition.x, targetPosition.z);
-    this.targetPosition.y = terrainHeight + 1; // Character height above terrain
-    
-    this.moveStartTime = Date.now(); // Track when movement started
-    
-    // Cancel any keyboard movement
-    this.movementDirection.set(0, 0, 0);
-    this.isMoving = true; // Set to true since we're starting click-to-move
-    
-    // Start walking animation (only if not already walking)
-    if (this.animationState !== 'walking') {
-      this.playAnimation('walking');
-    }
-    
-    console.log(`🖱️ Click-to-move target set: (${targetPosition.x.toFixed(1)}, ${this.targetPosition.y.toFixed(1)}, ${targetPosition.z.toFixed(1)}) [terrain: ${terrainHeight.toFixed(2)}]`);
+    this.targetPosition.y = 1;
+    this.playAnimation('walking');
   }
   
   public update(deltaTime: number): void {
@@ -321,20 +345,53 @@ export class Character3D {
       this.mixer.update(deltaTime);
     }
     
+    // Gentle spawn protection: Only fix obvious issues
+    if (!this.isFullyInitialized && this.animationState === 'walking' && !this.targetPosition && this.movementDirection.length() === 0) {
+      console.log(`🔧 Gentle spawn protection: Fixing walking animation during spawn`);
+      this.animationState = 'walking'; // Force change
+      this.playAnimation('idle');
+    }
+    
     // Handle movement
     this.updateMovement(deltaTime);
+    
+    // IMMEDIATE STOP CHECK: Additional safety check in main update loop (only after initialization)
+    if (this.isFullyInitialized && this.targetPosition && this.animationState === 'walking') {
+      const currentPos = this.group.position;
+      const targetDistance = currentPos.distanceTo(this.targetPosition);
+      const currentVelocity = this.physicsBody.velocity.length();
+      
+      // If we're close and not moving much, stop immediately
+      if (targetDistance < 0.2 && currentVelocity < 0.5) {
+        console.log(`🛑 UPDATE LOOP STOP: Distance ${targetDistance.toFixed(3)}, velocity ${currentVelocity.toFixed(3)}`);
+        this.targetPosition = null;
+        this.isMoving = false;
+        this.physicsBody.velocity.set(0, 0, 0);
+        this.animationState = 'walking'; // Force change
+        this.playAnimation('idle');
+      }
+    }
     
     // Sync physics to visual
     this.syncPhysicsToVisual();
     
-    // Safety check: ensure animation state matches actual movement state
-    const shouldBeMoving = this.targetPosition !== null || this.movementDirection.length() > 0;
-    if (shouldBeMoving && this.animationState === 'idle') {
-      console.log('🔧 Animation state correction: should be walking but is idle');
-      this.playAnimation('walking');
-    } else if (!shouldBeMoving && this.animationState === 'walking') {
-      console.log('🔧 Animation state correction: should be idle but is walking');
-      this.playAnimation('idle');
+    // Safety check: ensure animation state matches actual movement state (only after initialization)
+    // Only run this check very occasionally to avoid interfering with normal transitions
+    if (this.isFullyInitialized && Math.floor(Date.now() / 1000) % 5 === 0) { // Every 5 seconds, very infrequent
+      const shouldBeMoving = this.targetPosition !== null || this.movementDirection.length() > 0;
+      const actuallyMoving = this.physicsBody.velocity.length() > 0.1;
+      
+      // Only correct if there's a clear mismatch AND physics confirms the state
+      if (shouldBeMoving && !actuallyMoving && this.animationState === 'walking') {
+        console.log('🔧 Animation state correction: stuck walking but not moving - forcing idle');
+        this.targetPosition = null;
+        this.isMoving = false;
+        this.animationState = 'walking'; // Force change
+        this.playAnimation('idle');
+      } else if (!shouldBeMoving && actuallyMoving && this.animationState === 'idle') {
+        console.log('🔧 Animation state correction: moving but idle - forcing walking');
+        this.playAnimation('walking');
+      }
     }
     
     // Update nameplate to face camera
@@ -354,51 +411,21 @@ export class Character3D {
       const direction = new THREE.Vector3().subVectors(this.targetPosition, currentPos);
       const distance = direction.length();
       
-      if (distance > 0.1) { // Reduced threshold for smoother arrival
+      if (distance > 0.3) {
         direction.normalize();
         
-        // Smooth rotation towards target
-        const targetAngle = Math.atan2(direction.x, direction.z);
-        const currentAngle = this.group.rotation.y;
-        const angleDiff = Math.atan2(Math.sin(targetAngle - currentAngle), Math.cos(targetAngle - currentAngle));
-        this.group.rotation.y += angleDiff * Math.min(deltaTime * 8, 1); // Smooth rotation
+        // Face movement direction
+        const angle = Math.atan2(direction.x, direction.z);
+        this.group.rotation.y = angle;
         
-        // Apply movement velocity
         velocity.x = direction.x * this.moveSpeed;
         velocity.z = direction.z * this.moveSpeed;
-        
-        // Ensure walking animation is playing
-        if (this.animationState !== 'walking') {
-          this.playAnimation('walking');
-        }
       } else {
-        // We're close to target - start final approach
-        const lerpFactor = Math.min(deltaTime * 10, 1); // Smooth final approach
-        const oldPosition = this.group.position.clone();
-        this.group.position.lerp(this.targetPosition, lerpFactor);
-        this.physicsBody.position.set(this.group.position.x, this.group.position.y, this.group.position.z);
-        
-        // Check if we've actually moved very little (indicating we've reached the target)
-        const positionChange = oldPosition.distanceTo(this.group.position);
-        
-        // Safety timeout: if movement takes too long, force stop (prevents stuck walking animation)
-        const movementDuration = Date.now() - this.moveStartTime;
-        const maxMovementTime = 30000; // 30 seconds maximum
-        
-        // Stop when we're very close to target OR when position barely changes between frames OR timeout
-        if (distance < 0.05 || positionChange < 0.01 || movementDuration > maxMovementTime) {
-          this.targetPosition = null;
-          this.isMoving = false; // Update movement state
-          this.playAnimation('idle');
-          // Zero out velocity to ensure complete stop
-          this.physicsBody.velocity.set(0, 0, 0);
-          
-          if (movementDuration > maxMovementTime) {
-            console.log('⏰ Click-to-move timeout - forcing stop and idle animation');
-          } else {
-            console.log('🛑 Reached click-to-move destination, switching to idle');
-          }
-        }
+        // Close to target - stop immediately with no deceleration
+        this.targetPosition = null;
+        this.isMoving = false;
+        this.physicsBody.velocity.set(0, 0, 0);
+        this.playAnimation('idle');
       }
     } else if (this.movementDirection.length() > 0) {
       // Keyboard movement
@@ -415,13 +442,10 @@ export class Character3D {
   private syncPhysicsToVisual(): void {
     if (!this.physicsBody) return;
     
-    // Get terrain height at character position
-    const terrainHeight = this.getTerrainHeight(this.physicsBody.position.x, this.physicsBody.position.z);
-    
-    // Sync position with terrain following
+    // Simple sync - just copy physics position to group (no terrain following for now)
     this.group.position.set(
       this.physicsBody.position.x,
-      Math.max(terrainHeight, this.physicsBody.position.y), // Follow terrain or physics, whichever is higher
+      Math.max(0, this.physicsBody.position.y),
       this.physicsBody.position.z
     );
   }
@@ -539,7 +563,9 @@ export class Character3D {
   
   public isCurrentlyMoving(): boolean {
     // Character is moving if either keyboard movement is active OR click-to-move target exists
-    return this.isMoving || this.targetPosition !== null;
+    const keyboardMoving = this.isMoving;
+    const hasTarget = this.targetPosition !== null;
+    return keyboardMoving || hasTarget;
   }
   
   public getCurrentAnimationState(): 'idle' | 'walking' | 'running' {
@@ -547,13 +573,34 @@ export class Character3D {
   }
   
   public emergencyStop(): void {
+    console.log('🚨 EMERGENCY STOP: Forcing complete movement and animation stop');
+    
+    // Clear ALL movement states aggressively
     this.targetPosition = null;
     this.movementDirection.set(0, 0, 0);
     this.isMoving = false;
-    this.playAnimation('idle');
+    // Clear all movement states
+    
+    // Stop physics immediately
     if (this.physicsBody) {
       this.physicsBody.velocity.set(0, 0, 0);
+      this.physicsBody.angularVelocity.set(0, 0, 0);
     }
+    
+    // Force animation to idle with nuclear approach
+    if (this.mixer) {
+      this.mixer.stopAllAction();
+      this.animationState = 'walking'; // Force state change
+      this.playAnimation('idle');
+      
+      // Force multiple animation updates
+      for (let i = 0; i < 5; i++) {
+        this.mixer.update(0.033);
+      }
+    }
+    
+    // Verify all states are cleared
+    console.log(`🔍 Emergency stop complete - isMoving: ${this.isMoving}, hasTarget: ${this.targetPosition !== null}, isCurrentlyMoving: ${this.isCurrentlyMoving()}`);
   }
   
   public setAnimationState(state: 'idle' | 'walking' | 'running'): void {
@@ -565,6 +612,23 @@ export class Character3D {
   public setTerrainMesh(terrainMesh: THREE.Mesh | null): void {
     this.terrainMesh = terrainMesh;
     console.log(`🏔️ Terrain mesh ${terrainMesh ? 'set' : 'cleared'} for character ${this.name}`);
+  }
+  
+  public debugAnimationState(): void {
+    console.log(`🔍 DEBUG ${this.name}: Animation State Report`);
+    console.log(`  - animationState: ${this.animationState}`);
+    console.log(`  - isFullyInitialized: ${this.isFullyInitialized}`);
+    console.log(`  - targetPosition: ${this.targetPosition ? 'SET' : 'NULL'}`);
+    console.log(`  - isMoving: ${this.isMoving}`);
+    console.log(`  - movementDirection length: ${this.movementDirection.length()}`);
+    console.log(`  - currentAction: ${this.currentAction?.getClip().name || 'NULL'}`);
+    console.log(`  - mixer: ${this.mixer ? 'ACTIVE' : 'NULL'}`);
+    
+    if (this.currentAction) {
+      console.log(`  - currentAction enabled: ${this.currentAction.enabled}`);
+      console.log(`  - currentAction weight: ${this.currentAction.getEffectiveWeight()}`);
+      console.log(`  - currentAction time: ${this.currentAction.time}`);
+    }
   }
   
   public destroy(): void {

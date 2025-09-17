@@ -295,6 +295,7 @@ export class Game3DScene {
       
       // Expose character for debugging
       (window as any).debugCharacter = this.character;
+      (window as any).debugAnimationState = () => this.character?.debugAnimationState();
       
       console.log('🎬 SCENE: Character3D instantiation successful');
       debugConsole.addLog('LOG', ['🎬 SCENE: Character3D instantiation successful']);
@@ -396,25 +397,25 @@ export class Game3DScene {
   }
   
   private handleMouseClick(event: MouseEvent): void {
-    if (!this.character) return;
+    if (!this.character) {
+      console.warn('🚨 CLICK: No character available for click-to-move');
+      return;
+    }
     
-    console.log('🖱️ CLICK DEBUG: Mouse click detected');
+    if (!this.character.isFullyInitialized) {
+      console.warn('🚨 CLICK: Character not fully initialized yet');
+      return;
+    }
     
     // Calculate mouse position in normalized device coordinates
     const rect = this.renderer.domElement.getBoundingClientRect();
     this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     
-    console.log(`🖱️ CLICK DEBUG: Mouse NDC: (${this.mouse.x.toFixed(3)}, ${this.mouse.y.toFixed(3)})`);
-    console.log(`🖱️ CLICK DEBUG: Camera position: (${this.camera.position.x.toFixed(1)}, ${this.camera.position.y.toFixed(1)}, ${this.camera.position.z.toFixed(1)})`);
-    
     // Cast ray from camera through mouse position
     this.raycaster.setFromCamera(this.mouse, this.camera);
     
-    console.log(`🖱️ CLICK DEBUG: Ray origin: (${this.raycaster.ray.origin.x.toFixed(1)}, ${this.raycaster.ray.origin.y.toFixed(1)}, ${this.raycaster.ray.origin.z.toFixed(1)})`);
-    console.log(`🖱️ CLICK DEBUG: Ray direction: (${this.raycaster.ray.direction.x.toFixed(3)}, ${this.raycaster.ray.direction.y.toFixed(3)}, ${this.raycaster.ray.direction.z.toFixed(3)})`);
-    
-    // Alternative approach: Intersect with actual terrain if available
+    // Find intersection point
     let targetPosition: THREE.Vector3 | null = null;
     let intersectionFound = false;
     
@@ -424,7 +425,6 @@ export class Game3DScene {
       if (intersects.length > 0) {
         targetPosition = intersects[0].point;
         intersectionFound = true;
-        console.log(`🖱️ CLICK DEBUG: Terrain intersection found`);
       }
     }
     
@@ -433,25 +433,17 @@ export class Game3DScene {
       const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
       targetPosition = new THREE.Vector3();
       intersectionFound = this.raycaster.ray.intersectPlane(groundPlane, targetPosition) !== null;
-      console.log(`🖱️ CLICK DEBUG: Ground plane intersection: ${intersectionFound}`);
     }
     
-    console.log(`🖱️ CLICK DEBUG: Intersection found: ${intersectionFound !== null}`);
-    
     if (intersectionFound && targetPosition) {
-      console.log(`🖱️ CLICK DEBUG: Raw intersection: (${targetPosition.x.toFixed(1)}, ${targetPosition.y.toFixed(1)}, ${targetPosition.z.toFixed(1)})`);
-      
       // Check if intersection is reasonable
       const distanceFromOrigin = targetPosition.length();
       const characterPos = this.character.getPosition();
       const distanceFromCharacter = targetPosition.distanceTo(characterPos);
       
-      console.log(`🖱️ CLICK DEBUG: Distance from origin: ${distanceFromOrigin.toFixed(1)}`);
-      console.log(`🖱️ CLICK DEBUG: Distance from character: ${distanceFromCharacter.toFixed(1)}`);
-      
       // Reject unreasonable targets
       if (distanceFromOrigin > 200 || distanceFromCharacter > 100) {
-        console.warn(`🚨 CLICK DEBUG: Target too far, rejecting. Origin: ${distanceFromOrigin.toFixed(1)}, Character: ${distanceFromCharacter.toFixed(1)}`);
+        console.warn(`🚨 Click target too far, rejecting (${distanceFromCharacter.toFixed(1)} units)`);
         return;
       }
       
@@ -460,15 +452,19 @@ export class Game3DScene {
       targetPosition.x = Math.max(-maxDistance, Math.min(maxDistance, targetPosition.x));
       targetPosition.z = Math.max(-maxDistance, Math.min(maxDistance, targetPosition.z));
       
-      // Keep the Y coordinate from terrain intersection, don't override it
-      // The Character3D.moveToPosition() will handle terrain height detection
-      
-      console.log(`🖱️ CLICK DEBUG: Final target: (${targetPosition.x.toFixed(1)}, ${targetPosition.y.toFixed(1)}, ${targetPosition.z.toFixed(1)})`);
-      
       // Move character to clicked position
-      this.character.moveToPosition(targetPosition);
+      console.log(`🖱️ CLICK: Calling moveToPosition with (${targetPosition.x.toFixed(2)}, ${targetPosition.y.toFixed(2)}, ${targetPosition.z.toFixed(2)})`);
+      console.log(`🖱️ CLICK: Character reference:`, this.character);
+      console.log(`🖱️ CLICK: moveToPosition method:`, typeof this.character?.moveToPosition);
+      
+      if (this.character && this.character.moveToPosition) {
+        this.character.moveToPosition(targetPosition);
+        console.log(`🖱️ CLICK: moveToPosition called successfully`);
+      } else {
+        console.error(`🚨 CLICK: Character or moveToPosition method not available!`);
+      }
     } else {
-      console.warn('🚨 CLICK DEBUG: No intersection found with ground plane');
+      console.warn('🚨 No valid click target found');
     }
   }
   
@@ -487,23 +483,26 @@ export class Game3DScene {
     if (moveVector.length() > 0) {
       moveVector.normalize();
       moveVector.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.cameraRotationY);
-      this.character.setMovementDirection(moveVector);
-      
-      // Start broadcasting movement immediately when movement begins
-      if (!this.isMoving3D) {
-        this.isMoving3D = true;
-        console.log('🎮 Started WASD movement - beginning broadcast');
-      }
-    } else {
-      this.character.setMovementDirection(new THREE.Vector3(0, 0, 0));
-      
-      // Stop broadcasting when movement ends
-      if (this.isMoving3D) {
-        this.isMoving3D = false;
-        console.log('🛑 Stopped WASD movement - final broadcast');
-        // Send one final position update
-        this.broadcastMovementIfNeeded();
-      }
+    }
+    
+    // Set movement direction (no logging here - handled in unified system)
+    this.character.setMovementDirection(moveVector);
+  }
+  
+  private updateMovementState(): void {
+    if (!this.character) return;
+    
+    const characterIsMoving = this.character.isCurrentlyMoving();
+    const wasMoving = this.isMoving3D;
+    
+    // Update movement state
+    this.isMoving3D = characterIsMoving;
+    
+    // Log state changes only (not every frame)
+    if (characterIsMoving && !wasMoving) {
+      console.log('🎮 Movement started');
+    } else if (!characterIsMoving && wasMoving) {
+      console.log('🛑 Movement stopped');
     }
   }
   
@@ -782,8 +781,11 @@ export class Game3DScene {
         this.testCube.position.set(charPos.x, charPos.y, charPos.z); // Same position as character
       }
       
-      // Broadcast movement if character is moving or position changed
-      this.broadcastMovementIfNeeded();
+    // Unified Movement State Management
+    this.updateMovementState();
+    
+    // Broadcast movement if character is moving or position changed
+    this.broadcastMovementIfNeeded();
     }
     
     // Update other players
