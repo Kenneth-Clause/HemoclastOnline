@@ -23,7 +23,7 @@ export interface Character3DConfig {
 
 export class Character3D {
   static test() {
-    DebugConsole.info('SYSTEM', '🧪 Character3D SIMPLIFIED VERSION 4.0 - Direct GLTF Loading');
+    DebugConsole.info('GENERAL', '🧪 Character3D SIMPLIFIED VERSION 4.0 - Direct GLTF Loading');
     return true;
   }
   
@@ -73,7 +73,7 @@ export class Character3D {
     
     // Debug flag for Game3DScene
     (window as any).CHARACTER3D_CONSTRUCTOR_CALLED = true;
-    DebugConsole.debug('SYSTEM', '🎬 CHARACTER3D: Constructor called successfully');
+    DebugConsole.debug('GENERAL', '🎬 CHARACTER3D: Constructor called successfully');
     
     // Store references
     this.scene = config.scene;
@@ -106,8 +106,8 @@ export class Character3D {
     this.movementDirection.set(0, 0, 0);
     this.animationState = 'idle'; // Explicitly set initial animation state
     
-    DebugConsole.debug('SYSTEM', `✅ Character3D constructor completed for ${this.name}`);
-    DebugConsole.debug('SYSTEM', `🎬 CHARACTER3D: Constructor finished - methods available`);
+    DebugConsole.debug('GENERAL', `✅ Character3D constructor completed for ${this.name}`);
+    DebugConsole.debug('GENERAL', `🎬 CHARACTER3D: Constructor finished - methods available`);
   }
   
   private async loadCharacter(config: Character3DConfig): Promise<void> {
@@ -157,7 +157,7 @@ export class Character3D {
       
     } catch (error) {
       debugConsole.addLogLegacy('ERROR', [`❌ SIMPLE: Failed to load character: ${error}`]);
-      DebugConsole.error('ASSETS', `❌ Failed to load character ${this.name}:`, error);
+      DebugConsole.error('ASSETS', `❌ Failed to load character ${this.name}: ${error}`);
       
       // Make character visible anyway to prevent permanent invisibility
       this.group.visible = true;
@@ -348,7 +348,7 @@ export class Character3D {
       // Mark as fully initialized after reasonable delay
       setTimeout(() => {
         this.isFullyInitialized = true;
-        DebugConsole.info('SYSTEM', `✅ Character ${this.name} fully initialized - Animation: ${this.animationState}`);
+        DebugConsole.info('GENERAL', `✅ Character ${this.name} fully initialized - Animation: ${this.animationState}`);
       }, 300); // Short delay
       
     } else {
@@ -368,7 +368,7 @@ export class Character3D {
       // Even without animations, mark as initialized
       setTimeout(() => {
         this.isFullyInitialized = true;
-        DebugConsole.warn('SYSTEM', `✅ Character ${this.name} marked as initialized without animations`);
+        DebugConsole.warn('GENERAL', `✅ Character ${this.name} marked as initialized without animations`);
       }, 100);
     }
   }
@@ -813,7 +813,7 @@ export class Character3D {
   
   public setAsMainPlayer(isMain: boolean = true): void {
     this.isMainPlayer = isMain;
-    DebugConsole.info('SYSTEM', `👤 ${this.name}: Set as ${isMain ? 'MAIN' : 'OTHER'} player`);
+    DebugConsole.info('GENERAL', `👤 ${this.name}: Set as ${isMain ? 'MAIN' : 'OTHER'} player`);
   }
   
   public setSmoothPosition(targetPosition: THREE.Vector3): void {
@@ -855,19 +855,19 @@ export class Character3D {
   
   
   public debugAnimationState(): void {
-    DebugConsole.info('DEBUG', `🔍 ${this.name}: Animation State Report`);
-    DebugConsole.info('DEBUG', `  - animationState: ${this.animationState}`);
-    DebugConsole.info('DEBUG', `  - isFullyInitialized: ${this.isFullyInitialized}`);
-    DebugConsole.info('DEBUG', `  - targetPosition: ${this.targetPosition ? 'SET' : 'NULL'}`);
-    DebugConsole.info('DEBUG', `  - isMoving: ${this.isMoving}`);
-    DebugConsole.info('DEBUG', `  - movementDirection length: ${this.movementDirection.length()}`);
-    DebugConsole.info('DEBUG', `  - currentAction: ${this.currentAction?.getClip().name || 'NULL'}`);
-    DebugConsole.info('DEBUG', `  - mixer: ${this.mixer ? 'ACTIVE' : 'NULL'}`);
+    DebugConsole.info('GENERAL', `🔍 ${this.name}: Animation State Report`);
+    DebugConsole.info('GENERAL', `  - animationState: ${this.animationState}`);
+    DebugConsole.info('GENERAL', `  - isFullyInitialized: ${this.isFullyInitialized}`);
+    DebugConsole.info('GENERAL', `  - targetPosition: ${this.targetPosition ? 'SET' : 'NULL'}`);
+    DebugConsole.info('GENERAL', `  - isMoving: ${this.isMoving}`);
+    DebugConsole.info('GENERAL', `  - movementDirection length: ${this.movementDirection.length()}`);
+    DebugConsole.info('GENERAL', `  - currentAction: ${this.currentAction?.getClip().name || 'NULL'}`);
+    DebugConsole.info('GENERAL', `  - mixer: ${this.mixer ? 'ACTIVE' : 'NULL'}`);
     
     if (this.currentAction) {
-      DebugConsole.info('DEBUG', `  - currentAction enabled: ${this.currentAction.enabled}`);
-      DebugConsole.info('DEBUG', `  - currentAction weight: ${this.currentAction.getEffectiveWeight()}`);
-      DebugConsole.info('DEBUG', `  - currentAction time: ${this.currentAction.time}`);
+      DebugConsole.info('GENERAL', `  - currentAction enabled: ${this.currentAction.enabled}`);
+      DebugConsole.info('GENERAL', `  - currentAction weight: ${this.currentAction.getEffectiveWeight()}`);
+      DebugConsole.info('GENERAL', `  - currentAction time: ${this.currentAction.time}`);
     }
   }
   
@@ -897,6 +897,6 @@ export class Character3D {
       }
     });
     
-    DebugConsole.info('SYSTEM', `🧹 Destroyed character: ${this.name}`);
+    DebugConsole.info('GENERAL', `🧹 Destroyed character: ${this.name}`);
   }
 }

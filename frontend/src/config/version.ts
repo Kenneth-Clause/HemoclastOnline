@@ -15,7 +15,7 @@ export class VersionManager {
   private static readonly VERSION: VersionInfo = {
     major: 0,
     minor: 0,
-    patch: 23,
+    patch: 24,
     stage: 'Alpha',
     build: undefined
   };
