@@ -78,6 +78,9 @@ export class Character3D {
     this.group = new THREE.Group();
     this.group.position.copy(config.position);
     
+    // Hide the group initially to prevent bind pose flash
+    this.group.visible = false;
+    
     // Add to scene immediately
     this.scene.add(this.group);
     
@@ -91,6 +94,7 @@ export class Character3D {
     this.targetPosition = null;
     this.isMoving = false;
     this.movementDirection.set(0, 0, 0);
+    this.animationState = 'idle'; // Explicitly set initial animation state
     
     console.log(`✅ Character3D simplified constructor completed for ${this.name}`);
     console.log(`🎬 CHARACTER3D: Constructor finished - methods should be available`);
@@ -100,6 +104,7 @@ export class Character3D {
     const debugConsole = DebugConsole.getInstance();
     const modelPath = config.modelPath || '/models/characters/Godot/default_anims.glb';
     
+    console.log(`🔄 LOADING: Starting loadCharacter for ${this.name}`);
     debugConsole.addLog('WARN', [`🔄 SIMPLE: Loading GLTF directly: ${modelPath}`]);
     
     try {
@@ -119,11 +124,10 @@ export class Character3D {
         this.model.rotation.set(0, 0, 0);
         this.model.scale.setScalar(2); // Apply scale first
         
-        // Add model to group first at origin
+        // IMPORTANT: Don't add model to scene yet - set up animations first to avoid bind pose flash
         this.model.position.set(0, 0, 0);
-        this.group.add(this.model);
         
-        console.log(`📏 Model added to group at origin, will position after animation setup`);
+        console.log(`📏 Model prepared but not added to scene yet - will add after animation setup`);
       }
       
       // Setup materials for visibility
@@ -144,6 +148,17 @@ export class Character3D {
     } catch (error) {
       debugConsole.addLog('ERROR', [`❌ SIMPLE: Failed to load character: ${error}`]);
       console.error(`❌ Failed to load character ${this.name}:`, error);
+      
+      // Make character visible anyway to prevent permanent invisibility
+      this.group.visible = true;
+      console.log(`👁️ Character made visible due to loading error`);
+      
+      // Still mark as initialized to prevent indefinite waiting
+      setTimeout(() => {
+        this.isFullyInitialized = true;
+        console.log(`✅ Character ${this.name} marked as initialized despite loading error`);
+      }, 100);
+      
       throw error;
     }
   }
@@ -236,28 +251,69 @@ export class Character3D {
   private setupAnimations(): void {
     if (!this.mixer || this.animations.length === 0) return;
     
-    // List all available animations first
-    console.log(`🎭 Available animations (${this.animations.length}):`);
-    this.animations.forEach(clip => console.log(`  - ${clip.name}`));
+    // List all available animations first with detailed info
+    console.log(`🎭 DETAILED: Available animations (${this.animations.length}):`);
+    this.animations.forEach((clip, index) => {
+      console.log(`  ${index}: "${clip.name}" - Duration: ${clip.duration.toFixed(2)}s - Tracks: ${clip.tracks.length}`);
+    });
     
-    // Find and setup idle animation immediately - try multiple possible names
-    const idleClip = this.animations.find(clip => 
-      clip.name === 'Idle_Loop' || 
-      clip.name === 'idle' ||
-      clip.name === 'Idle' ||
-      clip.name.toLowerCase().includes('idle')
-    );
+    // Try different animation selection strategies
+    console.log(`🔍 ANALYSIS: Looking for idle animations...`);
+    
+    // Strategy 1: Look for exact matches first
+    let idleClip = this.animations.find(clip => clip.name === 'Idle_Loop');
+    if (idleClip) {
+      console.log(`✅ FOUND: Exact match "Idle_Loop"`);
+    } else {
+      // Strategy 2: Look for other idle variations
+      idleClip = this.animations.find(clip => 
+        clip.name === 'idle' ||
+        clip.name === 'Idle' ||
+        clip.name === 'IDLE'
+      );
+      if (idleClip) {
+        console.log(`✅ FOUND: Idle variation "${idleClip.name}"`);
+      } else {
+        // Strategy 3: Look for anything containing "idle"
+        idleClip = this.animations.find(clip => 
+          clip.name.toLowerCase().includes('idle')
+        );
+        if (idleClip) {
+          console.log(`✅ FOUND: Contains idle "${idleClip.name}"`);
+        } else {
+          // Strategy 4: Look for standing poses
+          idleClip = this.animations.find(clip => 
+            clip.name.toLowerCase().includes('stand') ||
+            clip.name.toLowerCase().includes('pose')
+          );
+          if (idleClip) {
+            console.log(`✅ FOUND: Standing pose "${idleClip.name}"`);
+          } else {
+            // Strategy 5: Use first animation as fallback
+            if (this.animations.length > 0) {
+              idleClip = this.animations[0];
+              console.log(`⚠️ FALLBACK: Using first animation "${idleClip.name}"`);
+            }
+          }
+        }
+      }
+    }
     
     if (idleClip) {
-      console.log(`🎭 CONSERVATIVE: Starting gentle idle animation setup for ${idleClip.name}`);
+      console.log(`🎭 PROPER SETUP: Setting up idle animation the RIGHT way for ${idleClip.name}`);
       
-      // CONSERVATIVE APPROACH: Gentle animation setup
+      // FIRST: Add the model to the scene BEFORE setting up animations
+      // This ensures the animation mixer has a proper scene context
+      if (this.model && this.model.parent !== this.group) {
+        this.group.add(this.model);
+        console.log(`📏 Model added to scene FIRST - before animation setup`);
+      }
+      
+      // SECOND: Now set up the animation with the model properly in the scene
       this.mixer.stopAllAction();
       
-      // Create action normally
+      // Create and configure the idle action
       this.currentAction = this.mixer.clipAction(idleClip);
-      
-      // Standard setup
       this.currentAction.reset();
       this.currentAction.setEffectiveWeight(1.0);
       this.currentAction.setEffectiveTimeScale(1.0);
@@ -267,24 +323,18 @@ export class Character3D {
       this.currentAction.play();
       
       this.animationState = 'idle';
-      console.log(`🎭 CONSERVATIVE: Started idle animation: ${idleClip.name}`);
+      console.log(`🎭 PROPER SETUP: Idle animation configured with model in scene: ${idleClip.name}`);
       
-      // Gentle animation updates - just enough to override bind pose
-      for (let i = 0; i < 8; i++) {
-        this.mixer.update(0.033);
+      // THIRD: Apply animation updates with the model properly in the scene
+      for (let i = 0; i < 10; i++) {
+        this.mixer.update(0.016); // Just a few updates to establish the pose
       }
       
-      console.log(`🎭 CONSERVATIVE: Applied 8 gentle animation updates`);
+      console.log(`🎭 PROPER SETUP: Applied animation updates with model in scene`);
       
-      // Call standard playAnimation method once
-      this.playAnimation('idle');
-      
-      // Additional gentle updates after playAnimation call
-      for (let i = 0; i < 3; i++) {
-        this.mixer.update(0.033);
-      }
-      
-      console.log(`🎭 CONSERVATIVE: Animation initialization complete - should be standing normally`);
+      // FOURTH: Make the character visible
+      this.group.visible = true;
+      console.log(`👁️ Character made visible with proper animation setup`);
       
       // Mark as fully initialized after reasonable delay
       setTimeout(() => {
@@ -296,10 +346,21 @@ export class Character3D {
       console.error(`❌ CRITICAL: No idle animation found!`);
       this.animations.forEach(clip => console.error(`Available: ${clip.name}`));
       
+      // Add the model to scene even without animations
+      if (this.model && this.model.parent !== this.group) {
+        this.group.add(this.model);
+        console.log(`📏 Model added to scene without animations`);
+      }
+      
+      // Make character visible even without animations
+      this.group.visible = true;
+      console.log(`👁️ Character made visible without animations`);
+      
       // Even without animations, mark as initialized
       setTimeout(() => {
         this.isFullyInitialized = true;
-      }, 300);
+        console.log(`✅ Character ${this.name} marked as initialized without animations`);
+      }, 100);
     }
   }
   
