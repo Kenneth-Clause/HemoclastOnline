@@ -161,17 +161,18 @@ export class AssetLoader {
                   skeleton
                 };
 
-                console.log(`✨ GLTF asset loaded successfully:`, {
-                  path: assetPath,
-                  animations: animations.length,
-                  hasSkeleton: !!skeleton,
-                  meshes: this.countMeshes(scene)
-                });
+            console.log(`✨ GLTF asset loaded successfully:`, {
+              path: assetPath,
+              animations: animations.length,
+              animationNames: animations.map(clip => clip.name),
+              hasSkeleton: !!skeleton,
+              meshes: this.countMeshes(scene)
+            });
 
                 resolve(asset);
               } catch (error) {
                 console.error(`❌ Error processing GLTF asset: ${assetPath}`, error);
-                reject(new Error(`Failed to process GLTF: ${error.message}`));
+                reject(new Error(`Failed to process GLTF: ${error instanceof Error ? error.message : 'Unknown error'}`));
               }
             },
             (progress) => {
@@ -180,7 +181,7 @@ export class AssetLoader {
             },
             (error) => {
               console.error(`❌ Failed to load GLTF asset: ${assetPath}`, error);
-              reject(new Error(`GLTF load error: ${error.message || 'Unknown error'}`));
+              reject(new Error(`GLTF load error: ${error instanceof Error ? error.message : 'Unknown error'}`));
             }
           );
         })
@@ -241,17 +242,43 @@ export class AssetLoader {
    * Play an animation on a character asset
    */
   public playAnimation(asset: CharacterAsset, animationName: string, loop: boolean = true): THREE.AnimationAction | null {
-    const clip = asset.animations.find(clip => clip.name === animationName);
+    let clip = asset.animations.find(clip => clip.name === animationName);
+    
     if (!clip) {
-      console.warn(`Animation "${animationName}" not found in asset`);
-      return null;
+      console.warn(`Animation "${animationName}" not found in asset. Available animations:`, asset.animations.map(c => c.name));
+      
+      // Try common fallbacks
+      const fallbacks = [
+        animationName.toLowerCase(),
+        animationName.toUpperCase(),
+        animationName.charAt(0).toUpperCase() + animationName.slice(1).toLowerCase()
+      ];
+      
+      for (const fallback of fallbacks) {
+        clip = asset.animations.find(c => c.name === fallback);
+        if (clip) {
+          console.log(`🎭 Using fallback animation: "${clip.name}" for "${animationName}"`);
+          break;
+        }
+      }
+      
+      // If still no animation found, use the first available animation
+      if (!clip && asset.animations.length > 0) {
+        clip = asset.animations[0];
+        console.log(`🎭 Using first available animation: "${clip.name}" as fallback for "${animationName}"`);
+      }
+      
+      if (!clip) {
+        console.error(`❌ No animations available in asset`);
+        return null;
+      }
     }
 
     const action = asset.mixer.clipAction(clip);
     action.loop = loop ? THREE.LoopRepeat : THREE.LoopOnce;
     action.play();
     
-    console.log(`🎭 Playing animation: ${animationName} (loop: ${loop})`);
+    console.log(`🎭 Playing animation: ${clip.name} (requested: ${animationName}, loop: ${loop})`);
     return action;
   }
 

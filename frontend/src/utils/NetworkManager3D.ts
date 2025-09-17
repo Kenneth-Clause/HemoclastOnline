@@ -379,7 +379,7 @@ export class NetworkManager3D {
     }
   }
   
-  public update(deltaTime: number): void {
+  public update(_deltaTime: number): void {
     // Periodic connection health check
     if (!this.isConnected && this.websocket?.readyState === WebSocket.OPEN) {
       this.isConnected = true;

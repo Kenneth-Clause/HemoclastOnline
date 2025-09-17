@@ -1,12 +1,13 @@
 /**
- * Character3D - 3D character representation with physics and networking
+ * Character3D - Simplified 3D character representation optimized for Godot GLTF assets
+ * Designed to work with Quaternius Universal Animation Library
  */
 
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { AssetLoader, CharacterAsset } from './AssetLoader';
-import { TestModelGenerator } from './TestModelGenerator';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MovementConfig } from '../config/movementConfig';
+import { DebugConsole } from './DebugConsole';
 
 export interface Character3DConfig {
   scene: THREE.Scene;
@@ -14,376 +15,251 @@ export interface Character3DConfig {
   name: string;
   characterClass: 'warrior' | 'rogue' | 'mage';
   position: THREE.Vector3;
-  useAssets?: boolean; // Whether to try loading GLTF models
-  modelPath?: string; // Custom model path
-  camera?: THREE.Camera; // Optional camera reference for nameplate facing
+  modelPath?: string;
+  camera?: THREE.Camera;
 }
 
 export class Character3D {
-  // Visual components
+  static test() {
+    console.log('🧪 Character3D SIMPLIFIED VERSION 4.0 - Direct GLTF Loading');
+    return true;
+  }
+  
+  // Core components
   private group: THREE.Group;
-  private mesh: THREE.Mesh | null = null;
-  private nameplate: THREE.Sprite | null = null;
-  
-  // Physics components
-  private physicsBody: CANNON.Body;
-  
-  // Animation and movement
+  private model: THREE.Group | null = null;
   private mixer: THREE.AnimationMixer | null = null;
-  private currentAnimation: THREE.AnimationAction | null = null;
-  private moveSpeed = MovementConfig.BASE_MOVE_SPEED; // Use centralized movement speed
+  private nameplate: THREE.Sprite | null = null;
+  private physicsBody!: CANNON.Body;
+  
+  // Animation state
+  private currentAction: THREE.AnimationAction | null = null;
+  private animations: THREE.AnimationClip[] = [];
+  private animationState: 'idle' | 'walking' | 'running' = 'idle';
+  
+  // Movement
+  private moveSpeed = MovementConfig.BASE_MOVE_SPEED;
   private isMoving = false;
   private movementDirection = new THREE.Vector3();
   private targetPosition: THREE.Vector3 | null = null;
-  
-  // Network player smoothing (simplified)
-  private lastPosition = new THREE.Vector3();
-  private targetPosition3D: THREE.Vector3 | null = null; // For network players
-  private lastRotation = new THREE.Euler();
-  private targetRotation: THREE.Euler | null = null;
-  
-  // Movement prediction
-  private predictedPosition = new THREE.Vector3();
-  private lastUpdateTime = 0;
-  private velocity = new THREE.Vector3();
-  private isLocalPlayer = true;
-  
-  // Animation state tracking with blending
-  private currentAnimationState: 'idle' | 'walking' | 'running' = 'idle';
-  private lastAnimationState: 'idle' | 'walking' | 'running' = 'idle';
-  private animationBlendTime = 0.3; // Seconds to blend between animations
-  private animationTransition: {
-    from: 'idle' | 'walking' | 'running';
-    to: 'idle' | 'walking' | 'running';
-    startTime: number;
-    duration: number;
-  } | null = null;
-  
-  // Three.js animation tracking (not Phaser)
-  private walkingAnimation: { active: boolean; startTime: number } = { active: false, startTime: 0 };
-  
-  // Click-to-move timeout tracking
-  private clickMoveStartTime: number = 0;
-  private readonly CLICK_MOVE_TIMEOUT = 10000; // 10 seconds max for click-to-move
-  
-  // Character properties
-  private name: string;
-  private characterClass: string;
-  private health = 100;
-  private maxHealth = 100;
   
   // References
   private scene: THREE.Scene;
   private physicsWorld: CANNON.World;
   private camera: THREE.Camera | null = null;
-  
-  // Asset system
-  private characterAsset: CharacterAsset | null = null;
-  private currentAnimationAction: THREE.AnimationAction | null = null;
-  private useAssets: boolean = false;
-  
+  private name: string;
+  private characterClass: string;
+
   constructor(config: Character3DConfig) {
+    const debugConsole = DebugConsole.getInstance();
+    debugConsole.addLog('WARN', ['🚨 CHARACTER3D SIMPLIFIED VERSION 4.0 - Direct GLTF Loading 🚨']);
+    
+    // Store references
     this.scene = config.scene;
     this.physicsWorld = config.physicsWorld;
     this.name = config.name;
     this.characterClass = config.characterClass;
     this.camera = config.camera || null;
-    // Disable asset loading by default until GLTF models are available
-    this.useAssets = config.useAssets || false;
     
-    // Initialize group first
+    // Create main group for character
     this.group = new THREE.Group();
+    this.group.position.copy(config.position);
     
-    // Initialize position tracking
-    this.lastPosition.copy(config.position);
-    this.predictedPosition.copy(config.position);
-    this.lastUpdateTime = Date.now();
+    // Add to scene immediately
+    this.scene.add(this.group);
     
-    // Create character (async if using assets)
-    this.initializeCharacter(config);
+    // Load character asynchronously
+    this.loadCharacter(config);
+    
+    // Create physics body
+    this.createPhysicsBody(config.position);
+    
+    console.log(`✅ Character3D simplified constructor completed for ${this.name}`);
   }
   
-  private async initializeCharacter(config: Character3DConfig): Promise<void> {
+  private async loadCharacter(config: Character3DConfig): Promise<void> {
+    const debugConsole = DebugConsole.getInstance();
+    const modelPath = config.modelPath || '/models/characters/Godot/default_anims.glb';
+    
+    debugConsole.addLog('WARN', [`🔄 SIMPLE: Loading GLTF directly: ${modelPath}`]);
+    
     try {
-      // Force procedural character creation for now (GLTF models not available)
-      if (this.useAssets && false) { // Temporarily disabled - change to true when GLTF models are available
-        await this.loadCharacterAsset(config);
-      } else {
-        this.useAssets = false; // Ensure we're not trying to use assets
-        this.createProceduralCharacter();
+      const loader = new GLTFLoader();
+      const gltf = await new Promise<any>((resolve, reject) => {
+        loader.load(modelPath, resolve, undefined, reject);
+      });
+      
+      // Store the model and animations
+      this.model = gltf.scene;
+      this.animations = gltf.animations;
+      
+      if (this.model) {
+        this.mixer = new THREE.AnimationMixer(this.model);
+        
+        // Apply scale first, then calculate positioning
+        this.model.rotation.set(0, 0, 0);
+        this.model.scale.setScalar(2); // Apply scale first
+        
+        // Add model to group first at origin
+        this.model.position.set(0, 0, 0);
+        this.group.add(this.model);
+        
+        console.log(`📏 Model added to group at origin, will position after animation setup`);
       }
       
-      this.createPhysicsBody(config.position);
+      // Setup materials for visibility
+      this.setupModelMaterials();
+      
+      // Create nameplate
       this.createNameplate();
+      
+      // Setup animations
       this.setupAnimations();
       
-      // Add to scene
-      this.scene.add(this.group);
+      // NOW position the character after animations are set up
+      this.positionCharacterOnGround();
       
-      console.log(`✨ Created 3D character: ${this.name} (${this.characterClass}) - Using procedural model`);
+      debugConsole.addLog('LOG', [`✅ SIMPLE: Character loaded successfully. Group children: ${this.group.children.length}`]);
+      console.log(`✅ SIMPLE: Character ${this.name} loaded with ${this.animations.length} animations`);
+      
     } catch (error) {
-      console.warn(`⚠️ Failed to initialize character ${this.name}, falling back to procedural:`, error);
-      this.useAssets = false;
-      this.createProceduralCharacter();
-      this.createPhysicsBody(config.position);
-      this.createNameplate();
-      this.setupAnimations();
-      this.scene.add(this.group);
+      debugConsole.addLog('ERROR', [`❌ SIMPLE: Failed to load character: ${error}`]);
+      console.error(`❌ Failed to load character ${this.name}:`, error);
+      throw error;
     }
   }
   
-  private async loadCharacterAsset(config: Character3DConfig): Promise<void> {
-    // DISABLED: GLTF models not available yet
-    console.log(`⚠️ GLTF asset loading disabled - using procedural character instead`);
-    throw new Error('GLTF asset loading is disabled until models are available');
-  }
-  
-  private getDefaultModelPath(): string {
-    // Map character classes to model files
-    const modelPaths = {
-      warrior: '/models/characters/warrior.glb',
-      rogue: '/models/characters/rogue.glb', 
-      mage: '/models/characters/mage.glb'
-    };
+  private setupModelMaterials(): void {
+    if (!this.model) return;
     
-    return modelPaths[this.characterClass as keyof typeof modelPaths] || modelPaths.warrior;
-  }
-  
-  private createProceduralCharacter(): void {
-    // Create enhanced procedural character using TestModelGenerator
-    const characterModel = TestModelGenerator.createEnhancedCharacter(this.characterClass as 'warrior' | 'rogue' | 'mage');
-    this.group.add(characterModel);
-    
-    // Find the main mesh for animations
-    characterModel.traverse((child) => {
-      if (child instanceof THREE.Mesh && !this.mesh) {
-        this.mesh = child;
+    // Apply simple green material for visibility
+    this.model.traverse((child) => {
+      if (child instanceof THREE.Mesh || child instanceof THREE.SkinnedMesh) {
+        const material = new THREE.MeshLambertMaterial({
+          color: 0x00ff00,
+          emissive: 0x002200
+        });
+        child.material = material;
+        child.castShadow = true;
+        child.receiveShadow = true;
       }
     });
     
-    console.log(`🎨 Created enhanced procedural ${this.characterClass} character`);
+    console.log(`🎨 Applied materials to character model`);
   }
   
-  private createEnhancedCharacterGeometry(): void {
-    // Create a more humanoid character using basic geometries
-    // This will be replaced with actual 3D models later
+  private createNameplate(): void {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d')!;
+    canvas.width = 512; // Larger canvas for better quality
+    canvas.height = 128;
     
-    // Body (torso - more rectangular/humanoid)
-    const bodyGeometry = new THREE.CylinderGeometry(0.35, 0.38, 1.4, 8);
-    const bodyMaterial = this.getClassMaterial();
-    const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-    body.position.y = 0.9;
-    body.castShadow = true;
-    body.receiveShadow = true;
-    this.group.add(body);
+    // Clean name
+    let cleanName = this.name || 'Player';
+    cleanName = cleanName.replace(/^["']|["']$/g, '').trim();
+    if (cleanName.length < 2) cleanName = 'Player';
     
-    // Head (sphere)
-    const headGeometry = new THREE.SphereGeometry(0.25, 12, 8);
-    const headMaterial = new THREE.MeshLambertMaterial({ color: 0xFFDBB3 });
-    const head = new THREE.Mesh(headGeometry, headMaterial);
-    head.position.y = 1.85;
-    head.castShadow = true;
-    head.receiveShadow = true;
-    this.group.add(head);
+    // Clear canvas with transparent background
+    context.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Shoulders (small spheres for better humanoid look)
-    const shoulderGeometry = new THREE.SphereGeometry(0.15, 8, 6);
-    const shoulderMaterial = bodyMaterial;
+    // Draw simple white text - no background, no outline
+    context.font = 'bold 48px Arial';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillStyle = '#FFFFFF';
+    context.fillText(cleanName, canvas.width / 2, canvas.height / 2);
     
-    const leftShoulder = new THREE.Mesh(shoulderGeometry, shoulderMaterial);
-    leftShoulder.position.set(-0.45, 1.5, 0);
-    leftShoulder.castShadow = true;
-    this.group.add(leftShoulder);
+    // Create sprite with proper transparency
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    const material = new THREE.SpriteMaterial({ 
+      map: texture, 
+      transparent: true,
+      alphaTest: 0.1, // Helps with transparency issues
+      sizeAttenuation: true // Let nameplate scale naturally with distance
+    });
+    this.nameplate = new THREE.Sprite(material);
+    this.nameplate.position.y = 3.5; // Closer to character
+    this.nameplate.scale.set(2.65, 1.15, 1); // Just a bit bigger for better visibility
     
-    const rightShoulder = new THREE.Mesh(shoulderGeometry, shoulderMaterial);
-    rightShoulder.position.set(0.45, 1.5, 0);
-    rightShoulder.castShadow = true;
-    this.group.add(rightShoulder);
-    
-    // Arms (cylinders)
-    const armGeometry = new THREE.CylinderGeometry(0.08, 0.1, 0.7, 8);
-    const armMaterial = new THREE.MeshLambertMaterial({ color: 0xFFDBB3 });
-    
-    const leftArm = new THREE.Mesh(armGeometry, armMaterial);
-    leftArm.position.set(-0.45, 1.0, 0);
-    leftArm.castShadow = true;
-    this.group.add(leftArm);
-    
-    const rightArm = new THREE.Mesh(armGeometry, armMaterial);
-    rightArm.position.set(0.45, 1.0, 0);
-    rightArm.castShadow = true;
-    this.group.add(rightArm);
-    
-    // Legs (cylinders - more proportional)
-    const legGeometry = new THREE.CylinderGeometry(0.1, 0.12, 0.8, 8);
-    const legMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
-    
-    const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
-    leftLeg.position.set(-0.15, 0.4, 0);
-    leftLeg.castShadow = true;
-    this.group.add(leftLeg);
-    
-    const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
-    rightLeg.position.set(0.15, 0.4, 0);
-    rightLeg.castShadow = true;
-    this.group.add(rightLeg);
-    
-    // Feet (small ellipsoids)
-    const footGeometry = new THREE.SphereGeometry(0.12, 8, 6);
-    footGeometry.scale(1.5, 0.5, 1);
-    const footMaterial = new THREE.MeshLambertMaterial({ color: 0x654321 });
-    
-    const leftFoot = new THREE.Mesh(footGeometry, footMaterial);
-    leftFoot.position.set(-0.15, 0.05, 0.1);
-    leftFoot.castShadow = true;
-    this.group.add(leftFoot);
-    
-    const rightFoot = new THREE.Mesh(footGeometry, footMaterial);
-    rightFoot.position.set(0.15, 0.05, 0.1);
-    rightFoot.castShadow = true;
-    this.group.add(rightFoot);
-    
-    // Weapon based on class
-    this.addClassSpecificWeapon();
-    
-    // Store main mesh reference
-    this.mesh = body;
-  }
-  
-  private getClassMaterial(): THREE.Material {
-    // Different colors for different classes
-    switch (this.characterClass) {
-      case 'warrior':
-        return new THREE.MeshLambertMaterial({ color: 0x8B4513 }); // Brown
-      case 'rogue':
-        return new THREE.MeshLambertMaterial({ color: 0x2F4F2F }); // Dark green
-      case 'mage':
-        return new THREE.MeshLambertMaterial({ color: 0x4B0082 }); // Indigo
-      default:
-        return new THREE.MeshLambertMaterial({ color: 0x808080 }); // Gray
-    }
-  }
-  
-  private addClassSpecificWeapon(): void {
-    let weaponGeometry: THREE.BufferGeometry;
-    const weaponMaterial = new THREE.MeshLambertMaterial({ color: 0xC0C0C0 });
-    
-    switch (this.characterClass) {
-      case 'warrior':
-        // Sword
-        weaponGeometry = new THREE.CylinderGeometry(0.02, 0.02, 1.2, 8);
-        break;
-      case 'rogue':
-        // Dagger
-        weaponGeometry = new THREE.CylinderGeometry(0.015, 0.015, 0.6, 8);
-        break;
-      case 'mage':
-        // Staff
-        weaponGeometry = new THREE.CylinderGeometry(0.03, 0.03, 1.5, 8);
-        break;
-      default:
-        return; // No weapon
-    }
-    
-    const weapon = new THREE.Mesh(weaponGeometry, weaponMaterial);
-    weapon.position.set(0.7, 1.2, 0);
-    weapon.rotation.z = -Math.PI / 4;
-    weapon.castShadow = true;
-    this.group.add(weapon);
+    this.group.add(this.nameplate);
+    console.log(`🏷️ Created enhanced nameplate for ${cleanName}`);
   }
   
   private createPhysicsBody(position: THREE.Vector3): void {
-    // Create physics body for collision detection - match the visual geometry
     const shape = new CANNON.Cylinder(0.35, 0.35, 1.6, 8);
     this.physicsBody = new CANNON.Body({
-      mass: 1, // Character has mass for physics
+      mass: 1,
       shape: shape,
       position: new CANNON.Vec3(position.x, position.y, position.z),
       material: new CANNON.Material({ friction: 0.3, restitution: 0.1 })
     });
     
-    // Lock rotation on X and Z axes (character stays upright)
     this.physicsBody.fixedRotation = true;
     this.physicsBody.updateMassProperties();
-    
     this.physicsWorld.addBody(this.physicsBody);
   }
   
-  private createNameplate(): void {
-    // Create sprite-based nameplate
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d')!;
-    canvas.width = 256;
-    canvas.height = 64;
+  private positionCharacterOnGround(): void {
+    if (!this.model) return;
     
-    // Clean the name - remove any extra formatting, quotes, or metadata
-    let cleanName = this.name;
+    // Calculate bounds AFTER animations are set up and running
+    const boundingBox = new THREE.Box3().setFromObject(this.model);
+    const modelHeight = boundingBox.getSize(new THREE.Vector3()).y;
+    const minY = boundingBox.min.y;
     
-    // Handle various problematic name formats
-    if (!cleanName || cleanName === 'undefined' || cleanName === 'null' || cleanName.trim() === '') {
-      cleanName = 'Unknown Character';
-    } else {
-      cleanName = cleanName
-        .replace(/^["']|["']$/g, '') // Remove surrounding quotes
-        .replace(/\s*\(.*?\)\s*/g, '') // Remove parenthetical content like (Level 1)
-        .replace(/\s*-.*$/g, '') // Remove dashes and everything after
-        .replace(/Unknown Character/gi, 'Player') // Replace generic names
-        .trim();
-        
-      // Final check for empty or very short names
-      if (cleanName.length < 2) {
-        cleanName = 'Player';
-      }
-    }
+    // Position so feet are just above ground level
+    this.model.position.set(0, -minY - 0.1, 0); // Raise character up to proper ground level
     
-    // Clear the entire canvas first
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Set up text styling
-    context.font = '24px Arial, sans-serif'; // Slightly larger font for readability
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-    
-    // Just draw clean white text - no background, no outline
-    context.fillStyle = '#FFFFFF';
-    context.fillText(cleanName, canvas.width / 2, canvas.height / 2);
-    
-    // Create texture and sprite
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.needsUpdate = true;
-    const material = new THREE.SpriteMaterial({ 
-      map: texture,
-      transparent: true,
-      alphaTest: 0.01,
-      sizeAttenuation: false // Prevent size scaling with distance
-    });
-    this.nameplate = new THREE.Sprite(material);
-    this.nameplate.position.y = 2.5; // Above character head
-    this.nameplate.scale.set(0.1, 0.05, 1); // Very small nameplates
-    
-    this.group.add(this.nameplate);
-    
-    console.log(`🏷️ Created nameplate for "${cleanName}" (original: "${this.name}")`);
+    console.log(`🔧 FINAL: Positioned character after animation setup - height: ${modelHeight.toFixed(2)}, y: ${(-minY - 0.85).toFixed(2)}`);
   }
   
   private setupAnimations(): void {
-    // For now, create simple procedural animations
-    // In production, you'd load actual animation clips
-    this.mixer = new THREE.AnimationMixer(this.group);
+    if (!this.mixer || this.animations.length === 0) return;
     
-    // Create simple idle animation (slight bobbing)
-    const idleKeyframes = new THREE.VectorKeyframeTrack(
-      '.position',
-      [0, 1, 2],
-      [0, 0, 0, 0, 0.05, 0, 0, 0, 0]
+    // List all available animations first
+    console.log(`🎭 Available animations (${this.animations.length}):`);
+    this.animations.forEach(clip => console.log(`  - ${clip.name}`));
+    
+    // Find and setup idle animation immediately - try multiple possible names
+    const idleClip = this.animations.find(clip => 
+      clip.name === 'Idle_Loop' || 
+      clip.name === 'idle' ||
+      clip.name === 'Idle' ||
+      clip.name.toLowerCase().includes('idle')
     );
     
-    const idleClip = new THREE.AnimationClip('idle', 2, [idleKeyframes]);
-    const idleAction = this.mixer.clipAction(idleClip);
-    idleAction.loop = THREE.LoopRepeat;
-    
-    this.currentAnimation = idleAction;
-    this.currentAnimation.play();
+    if (idleClip) {
+      this.currentAction = this.mixer.clipAction(idleClip);
+      
+      // NUCLEAR ANIMATION APPROACH: Stop all other actions first
+      this.mixer.stopAllAction();
+      
+      this.currentAction.reset();
+      this.currentAction.setEffectiveWeight(1.0);
+      this.currentAction.setEffectiveTimeScale(1.0);
+      this.currentAction.enabled = true;
+      this.currentAction.clampWhenFinished = false;
+      this.currentAction.loop = THREE.LoopRepeat;
+      this.currentAction.play();
+      
+      this.animationState = 'idle';
+      console.log(`🎭 NUCLEAR: Started idle animation: ${idleClip.name}`);
+      
+      // SUPER AGGRESSIVE: Force many animation updates
+      for (let i = 0; i < 10; i++) {
+        this.mixer.update(0.033);
+      }
+      
+      console.log(`🎭 NUCLEAR: Forced 10 animation updates to override any default pose`);
+      
+      // ALSO call our standard playAnimation method to ensure proper setup
+      this.playAnimation('idle');
+      
+    } else {
+      console.error(`❌ CRITICAL: No idle animation found!`);
+      this.animations.forEach(clip => console.error(`Available: ${clip.name}`));
+    }
   }
   
   public setMovementDirection(direction: THREE.Vector3): void {
@@ -391,237 +267,123 @@ export class Character3D {
     const wasMoving = this.isMoving;
     this.isMoving = direction.length() > 0;
     
-    // CRITICAL: Cancel click-to-move if keyboard input detected
+    // Cancel click-to-move if keyboard input
     if (this.isMoving && this.targetPosition) {
-      console.log('🎮 WASD OVERRIDE: Canceling click-to-move target');
       this.targetPosition = null;
     }
     
-    // Update character rotation to face movement direction
+    // Face movement direction
     if (this.isMoving) {
       const angle = Math.atan2(direction.x, direction.z);
       this.group.rotation.y = angle;
-      // Removed excessive logging for cleaner output
     }
     
-    // Update animation state based on movement
+    // Update animation
     if (this.isMoving && !wasMoving) {
-      // Started moving
-      this.setAnimationState('walking');
-      console.log('🚶 Started WASD walking animation');
+      this.playAnimation('walking');
     } else if (!this.isMoving && wasMoving) {
-      // Stopped moving
-      this.setAnimationState('idle');
-      console.log('🛑 Stopped WASD - idle animation');
+      this.playAnimation('idle');
     }
   }
   
-  public moveToPosition(targetPosition: THREE.Vector3, isLocalPlayer: boolean = true): void {
-    // For network players, just set position directly (keep it simple)
-    if (!isLocalPlayer) {
-      console.log(`👥 NETWORK: Moving other player to (${targetPosition.x.toFixed(1)}, ${targetPosition.z.toFixed(1)})`);
-      this.setPosition(targetPosition);
-      return;
-    }
-    
-    // LOCAL PLAYER CLICK-TO-MOVE VALIDATION
-    console.log('🖱️ LOCAL CLICK-TO-MOVE: Starting validation...');
-    
-    // Validate target position
-    if (!targetPosition || !isFinite(targetPosition.x) || !isFinite(targetPosition.z)) {
-      console.error('🚨 INVALID TARGET: Target position is invalid:', targetPosition);
-      return;
-    }
-    
-    const currentPos = this.group.position;
-    const distance = targetPosition.distanceTo(currentPos);
-    
-    // Reject targets that are too far
-    if (distance > 100) {
-      console.warn(`🚨 TARGET TOO FAR: Distance ${distance.toFixed(1)} > 100, rejecting click-to-move`);
-      return;
-    }
-    
-    // Validate target is within reasonable world bounds
-    if (Math.abs(targetPosition.x) > 95 || Math.abs(targetPosition.z) > 95) {
-      console.warn(`🚨 TARGET OUT OF BOUNDS: (${targetPosition.x.toFixed(1)}, ${targetPosition.z.toFixed(1)}) - rejecting`);
-      return;
-    }
-    
-    // Cancel any existing WASD movement
-    this.movementDirection.set(0, 0, 0);
-    
+  public moveToPosition(targetPosition: THREE.Vector3): void {
     this.targetPosition = targetPosition.clone();
-    this.targetPosition.y = 1; // Force ground level
-    this.clickMoveStartTime = Date.now(); // Start timeout tracking
-    
-    console.log(`🖱️ VALID TARGET: Moving from (${currentPos.x.toFixed(1)}, ${currentPos.z.toFixed(1)}) to (${this.targetPosition.x.toFixed(1)}, ${this.targetPosition.z.toFixed(1)}) - distance: ${distance.toFixed(1)}`);
-    
-    // Face the target position
-    const direction = new THREE.Vector3()
-      .subVectors(this.targetPosition, this.group.position)
-      .normalize();
-    
-    if (direction.length() > 0) {
-      const angle = Math.atan2(direction.x, direction.z);
-      this.group.rotation.y = angle;
-      console.log(`🎯 Click-to-move facing direction: ${(angle * 180 / Math.PI).toFixed(1)}° towards (${targetPosition.x.toFixed(1)}, ${targetPosition.z.toFixed(1)})`);
-    }
-    
-    // Set walking animation for click-to-move
-    this.setAnimationState('walking');
+    this.targetPosition.y = 1;
+    this.playAnimation('walking');
   }
   
   public update(deltaTime: number): void {
-    // Update GLTF animations if using assets
-    if (this.useAssets && this.characterAsset) {
-      this.characterAsset.mixer.update(deltaTime);
-    }
-    
-    // Update procedural animations if using basic geometry
+    // Update animations
     if (this.mixer) {
       this.mixer.update(deltaTime);
     }
     
-    // Update Three.js-based animations (procedural)
-    this.updateThreeJSAnimations();
-    
-    // Update network smoothing for remote players
-    this.updateNetworkSmoothing(deltaTime);
-    
-    // Handle movement (local player only)
+    // Handle movement
     this.updateMovement(deltaTime);
     
-    // Sync physics body position with visual representation
+    // Sync physics to visual
     this.syncPhysicsToVisual();
     
-    // Update nameplate to always face camera (if camera is available)
+    // Update nameplate to face camera
     if (this.nameplate && this.camera) {
-      // Make nameplate always face the camera
       this.nameplate.lookAt(this.camera.position);
     }
   }
   
-  private updateThreeJSAnimations(): void {
-    // Handle walking animation (bobbing effect)
-    if (this.walkingAnimation.active && this.mesh) {
-      const elapsedTime = Date.now() - this.walkingAnimation.startTime;
-      const bobIntensity = 0.05;
-      const bobSpeed = 0.01;
-      
-      // Create bobbing effect using sine wave
-      const bobOffset = Math.sin(elapsedTime * bobSpeed) * bobIntensity;
-      this.mesh.scale.y = 1 + bobOffset;
-    }
-  }
-  
-  private updateMovement(deltaTime: number): void {
-    // Skip movement update if physics body isn't initialized yet
-    if (!this.physicsBody) {
-      return;
-    }
+  private updateMovement(_deltaTime: number): void {
+    if (!this.physicsBody) return;
     
     const velocity = new CANNON.Vec3(0, 0, 0);
     
-    // Emergency stop if character is too far from origin
-    const currentPos = this.group.position;
-    const distanceFromOrigin = currentPos.length();
-    
-    if (distanceFromOrigin > 150) {
-      console.error(`🚨 EMERGENCY STOP: Character too far from origin (${distanceFromOrigin.toFixed(1)}), resetting to center`);
-      this.setPosition(new THREE.Vector3(0, 1, 0));
-      this.targetPosition = null;
-      this.setAnimationState('idle');
-      return;
-    }
-    
     if (this.targetPosition) {
-      // Check for click-to-move timeout
-      const clickMoveElapsed = Date.now() - this.clickMoveStartTime;
-      if (clickMoveElapsed > this.CLICK_MOVE_TIMEOUT) {
-        console.warn(`⏰ TIMEOUT: Click-to-move taking too long (${clickMoveElapsed}ms), canceling target`);
-        this.targetPosition = null;
-        this.setAnimationState('idle');
-        return;
-      }
-      
-      // CRITICAL FIX: Use physics body position for accurate distance calculation
-      const actualCurrentPos = new THREE.Vector3(
-        this.physicsBody.position.x,
-        this.physicsBody.position.y,
-        this.physicsBody.position.z
-      );
-      
-      // Click-to-move behavior
-      const direction = new THREE.Vector3()
-        .subVectors(this.targetPosition, actualCurrentPos);
-      
+      // Click-to-move
+      const currentPos = this.group.position;
+      const direction = new THREE.Vector3().subVectors(this.targetPosition, currentPos);
       const distance = direction.length();
       
-      if (distance > 0.5) { // Increased threshold for more precise stopping
+      if (distance > 0.5) {
         direction.normalize();
         velocity.x = direction.x * this.moveSpeed;
         velocity.z = direction.z * this.moveSpeed;
-        this.isMoving = true;
-        
-        console.log(`🏃 MOVEMENT: Current: (${actualCurrentPos.x.toFixed(1)}, ${actualCurrentPos.z.toFixed(1)}), Target: (${this.targetPosition.x.toFixed(1)}, ${this.targetPosition.z.toFixed(1)}), Distance: ${distance.toFixed(1)}, Velocity: (${velocity.x.toFixed(1)}, ${velocity.z.toFixed(1)})`);
-        
-        // Ensure walking animation is playing
-        if (this.currentAnimationState !== 'walking') {
-          this.setAnimationState('walking');
-        }
       } else {
-        // Reached target - snap to exact position
-        console.log(`🎯 REACHED TARGET: Snapping from (${actualCurrentPos.x.toFixed(1)}, ${actualCurrentPos.z.toFixed(1)}) to (${this.targetPosition.x.toFixed(1)}, ${this.targetPosition.z.toFixed(1)})`);
-        
+        // Reached target
         this.group.position.copy(this.targetPosition);
         this.physicsBody.position.set(this.targetPosition.x, this.targetPosition.y, this.targetPosition.z);
         this.targetPosition = null;
-        this.isMoving = false;
-        
-        // Stop animation - go to idle
-        this.setAnimationState('idle');
-        console.log('🎯 Reached click target - stopping animation');
+        this.playAnimation('idle');
       }
     } else if (this.movementDirection.length() > 0) {
       // Keyboard movement
-      const normalizedDirection = this.movementDirection.clone().normalize();
-      velocity.x = normalizedDirection.x * this.moveSpeed;
-      velocity.z = normalizedDirection.z * this.moveSpeed;
-      this.isMoving = true;
-    } else {
-      this.isMoving = false;
+      const direction = this.movementDirection.clone().normalize();
+      velocity.x = direction.x * this.moveSpeed;
+      velocity.z = direction.z * this.moveSpeed;
     }
     
-    // Apply movement to physics body
+    // Apply velocity
     this.physicsBody.velocity.x = velocity.x;
     this.physicsBody.velocity.z = velocity.z;
-    
-    // Keep character grounded (prevent floating)
-    if (this.physicsBody.position.y > 1) {
-      this.physicsBody.velocity.y = Math.min(this.physicsBody.velocity.y, 0);
-    }
   }
   
   private syncPhysicsToVisual(): void {
-    // Skip sync if physics body isn't initialized yet
-    if (!this.physicsBody) {
-      return;
-    }
+    if (!this.physicsBody) return;
     
-    // Sync visual position with physics body
+    // Simple sync - just copy physics position to group
     this.group.position.set(
       this.physicsBody.position.x,
-      Math.max(0, this.physicsBody.position.y), // Keep above ground
+      Math.max(0, this.physicsBody.position.y),
       this.physicsBody.position.z
     );
-    
-    // Debug position sync
-    if (this.targetPosition) {
-      console.log(`🔄 SYNC: Physics: (${this.physicsBody.position.x.toFixed(1)}, ${this.physicsBody.position.z.toFixed(1)}), Visual: (${this.group.position.x.toFixed(1)}, ${this.group.position.z.toFixed(1)})`);
-    }
   }
   
+  private playAnimation(animationName: 'idle' | 'walking' | 'running'): void {
+    if (!this.mixer) return;
+    
+    // Map to Quaternius animation names
+    const animationMap = {
+      idle: 'Idle_Loop',
+      walking: 'Walk_Loop',
+      running: 'Jog_Fwd_Loop'
+    };
+    
+    const targetAnimName = animationMap[animationName];
+    const targetClip = this.animations.find(clip => clip.name === targetAnimName);
+    
+    if (!targetClip) return;
+    
+    // Fade out current animation
+    if (this.currentAction) {
+      this.currentAction.fadeOut(0.3);
+    }
+    
+    // Fade in new animation
+    this.currentAction = this.mixer.clipAction(targetClip);
+    this.currentAction.reset().fadeIn(0.3).play();
+    this.animationState = animationName;
+    
+    console.log(`🎭 Playing animation: ${targetAnimName}`);
+  }
+  
+  // Public API methods
   public getPosition(): THREE.Vector3 {
     return this.group.position.clone();
   }
@@ -631,35 +393,6 @@ export class Character3D {
     if (this.physicsBody) {
       this.physicsBody.position.copy(position as any);
     }
-    this.lastPosition.copy(position);
-  }
-  
-  public setSmoothPosition(targetPosition: THREE.Vector3): void {
-    // Validate position before setting
-    if (!isFinite(targetPosition.x) || !isFinite(targetPosition.y) || !isFinite(targetPosition.z)) {
-      console.warn(`⚠️ Invalid target position for ${this.name}:`, targetPosition);
-      return;
-    }
-    
-    // DIRECT POSITION UPDATE - No interpolation, no smoothing
-    this.group.position.copy(targetPosition);
-    if (this.physicsBody) {
-      this.physicsBody.position.copy(targetPosition as any);
-    }
-    
-    this.isLocalPlayer = false;
-    console.log(`📍 DIRECT: ${this.name} moved to (${targetPosition.x.toFixed(2)}, ${targetPosition.y.toFixed(2)}, ${targetPosition.z.toFixed(2)})`);
-  }
-  
-  public setSmoothRotation(targetRotation: THREE.Euler): void {
-    // DIRECT ROTATION UPDATE - No interpolation, no smoothing
-    this.group.rotation.copy(targetRotation);
-    console.log(`🔄 DIRECT: ${this.name} rotation set to Y=${targetRotation.y.toFixed(2)}`);
-  }
-  
-  private updateNetworkSmoothing(deltaTime: number): void {
-    // NO NETWORK SMOOTHING - All updates are now direct and immediate
-    // This method is kept for compatibility but does nothing
   }
   
   public getRotation(): THREE.Euler {
@@ -668,35 +401,10 @@ export class Character3D {
   
   public setRotation(rotation: THREE.Euler): void {
     this.group.rotation.copy(rotation);
-    console.log(`🔄 Set rotation for ${this.name}: Y=${rotation.y.toFixed(2)} (${(rotation.y * 180 / Math.PI).toFixed(1)}°)`);
   }
   
-  public getFacingDirection(): THREE.Vector3 {
-    // Get the direction the character is facing based on Y rotation
-    const direction = new THREE.Vector3(0, 0, -1); // Forward in Three.js
-    direction.applyEuler(this.group.rotation);
-    return direction.normalize();
-  }
-  
-  // Expose group for direct access (needed for rotation in Game3DScene)
   public getGroup(): THREE.Group {
     return this.group;
-  }
-  
-  public setOpacity(opacity: number): void {
-    this.group.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        if (Array.isArray(child.material)) {
-          child.material.forEach(material => {
-            material.transparent = opacity < 1;
-            material.opacity = opacity;
-          });
-        } else {
-          child.material.transparent = opacity < 1;
-          child.material.opacity = opacity;
-        }
-      }
-    });
   }
   
   public getName(): string {
@@ -712,185 +420,38 @@ export class Character3D {
   }
   
   public getCurrentAnimationState(): 'idle' | 'walking' | 'running' {
-    return this.currentAnimationState;
+    return this.animationState;
   }
   
   public emergencyStop(): void {
-    console.log('🚨 EMERGENCY STOP: Clearing all movement and targets');
     this.targetPosition = null;
     this.movementDirection.set(0, 0, 0);
     this.isMoving = false;
-    this.setAnimationState('idle');
-    
-    // Stop physics movement
-    this.physicsBody.velocity.set(0, 0, 0);
-  }
-  
-  public setAnimationState(state: 'idle' | 'walking' | 'running', force: boolean = false): void {
-    if (this.currentAnimationState !== state || force) {
-      // Start animation transition
-      this.animationTransition = {
-        from: this.currentAnimationState,
-        to: state,
-        startTime: Date.now(),
-        duration: this.animationBlendTime * 1000 // Convert to milliseconds
-      };
-      
-      this.lastAnimationState = this.currentAnimationState;
-      this.currentAnimationState = state;
-      
-      console.log(`🎭 Animation blending for ${this.name}: ${this.lastAnimationState} → ${this.currentAnimationState} (${this.animationBlendTime}s)${force ? ' (forced)' : ''}`);
-      
-      // Update visual animation with blending
-      this.updateAnimationVisuals();
-    } else {
-      // Log when animation state is already correct (for debugging network sync)
-      if (force) {
-        console.log(`🎭 Animation state already ${state} for ${this.name} (no change needed)`);
-      }
+    this.playAnimation('idle');
+    if (this.physicsBody) {
+      this.physicsBody.velocity.set(0, 0, 0);
     }
   }
   
-  private updateAnimationVisuals(): void {
-    // Handle animation blending if in transition
-    if (this.animationTransition) {
-      const elapsed = Date.now() - this.animationTransition.startTime;
-      const progress = Math.min(elapsed / this.animationTransition.duration, 1.0);
-      
-      if (progress >= 1.0) {
-        // Transition complete
-        this.animationTransition = null;
-      } else {
-        // Still blending - implement real blending for GLTF assets
-        if (this.useAssets && this.characterAsset) {
-          console.log(`🔄 GLTF Animation blend progress: ${(progress * 100).toFixed(1)}% (${this.animationTransition.from} → ${this.animationTransition.to})`);
-        } else {
-          console.log(`🔄 Procedural animation blend progress: ${(progress * 100).toFixed(1)}% (${this.animationTransition.from} → ${this.animationTransition.to})`);
-        }
-      }
+  public setAnimationState(state: 'idle' | 'walking' | 'running'): void {
+    if (this.animationState !== state) {
+      this.playAnimation(state);
     }
-    
-    // Update visual representation based on animation state
-    if (this.useAssets && this.characterAsset) {
-      this.updateGLTFAnimations();
-    } else {
-      this.updateProceduralAnimations();
-    }
-  }
-  
-  private updateGLTFAnimations(): void {
-    if (!this.characterAsset) return;
-    
-    const assetLoader = AssetLoader.getInstance();
-    const animationName = this.getGLTFAnimationName(this.currentAnimationState);
-    
-    if (this.currentAnimationAction) {
-      // Blend to new animation
-      this.currentAnimationAction = assetLoader.blendToAnimation(
-        this.characterAsset,
-        this.currentAnimationAction,
-        animationName,
-        this.animationBlendTime
-      );
-    } else {
-      // Play initial animation
-      this.currentAnimationAction = assetLoader.playAnimation(this.characterAsset, animationName);
-    }
-  }
-  
-  private updateProceduralAnimations(): void {
-    // Update procedural visual representation based on animation state
-    switch (this.currentAnimationState) {
-      case 'idle':
-        this.stopMovementAnimation();
-        break;
-      case 'walking':
-      case 'running':
-        this.startMovementAnimation();
-        break;
-    }
-  }
-  
-  private getGLTFAnimationName(state: 'idle' | 'walking' | 'running'): string {
-    // Map our animation states to common GLTF animation names
-    const animationMap = {
-      idle: 'Idle',
-      walking: 'Walk',
-      running: 'Run'
-    };
-    
-    return animationMap[state] || 'Idle';
-  }
-  
-  private startMovementAnimation(): void {
-    // Start Three.js-based movement animation
-    this.walkingAnimation.active = true;
-    this.walkingAnimation.startTime = Date.now();
-    console.log('🚶 Started Three.js walking animation');
-  }
-  
-  private stopMovementAnimation(): void {
-    // Stop Three.js-based movement animation
-    this.walkingAnimation.active = false;
-    
-    // Reset mesh scale
-    if (this.mesh) {
-      this.mesh.scale.set(1, 1, 1);
-    }
-    console.log('🛑 Stopped Three.js walking animation');
-  }
-  
-  public getHealth(): number {
-    return this.health;
-  }
-  
-  public setHealth(health: number): void {
-    this.health = Math.max(0, Math.min(health, this.maxHealth));
-    
-    // Update visual health indicator if needed
-    this.updateHealthDisplay();
-  }
-  
-  private updateHealthDisplay(): void {
-    // Add health bar above nameplate
-    // Implementation would go here
-  }
-  
-  public takeDamage(damage: number): void {
-    this.setHealth(this.health - damage);
-    
-    // Add damage animation/effect
-    this.playDamageEffect();
-  }
-  
-  private playDamageEffect(): void {
-    // Flash red briefly
-    if (this.mesh) {
-      const originalMaterial = this.mesh.material;
-      const damageMaterial = new THREE.MeshLambertMaterial({ color: 0xFF0000 });
-      
-      this.mesh.material = damageMaterial;
-      
-      setTimeout(() => {
-        if (this.mesh) {
-          this.mesh.material = originalMaterial;
-        }
-      }, 200);
-    }
-  }
-  
-  public playAnimation(animationName: string): void {
-    // Switch to different animation
-    // Implementation would depend on loaded animation clips
-    console.log(`Playing animation: ${animationName}`);
   }
   
   public destroy(): void {
     // Remove from physics world
-    this.physicsWorld.removeBody(this.physicsBody);
+    if (this.physicsBody) {
+      this.physicsWorld.removeBody(this.physicsBody);
+    }
     
     // Remove from scene
     this.scene.remove(this.group);
+    
+    // Clean up animations
+    if (this.mixer) {
+      this.mixer.stopAllAction();
+    }
     
     // Clean up geometries and materials
     this.group.traverse((child) => {
@@ -904,11 +465,6 @@ export class Character3D {
       }
     });
     
-    // Clean up animations
-    if (this.mixer) {
-      this.mixer.stopAllAction();
-    }
-    
-    console.log(`🧹 Destroyed 3D character: ${this.name}`);
+    console.log(`🧹 Destroyed character: ${this.name}`);
   }
 }

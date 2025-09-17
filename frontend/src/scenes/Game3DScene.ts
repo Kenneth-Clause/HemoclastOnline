@@ -7,6 +7,11 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { GameStore } from '../stores/gameStore';
 import { Character3D } from '../utils/Character3D';
+import { DebugConsole } from '../utils/DebugConsole';
+
+// Debug: Immediate import test
+console.log('🔍 IMPORT: Character3D imported:', Character3D);
+console.log('🔍 IMPORT: typeof Character3D:', typeof Character3D);
 import { Environment3D } from '../utils/Environment3D';
 import { NetworkManager3D } from '../utils/NetworkManager3D';
 import { MovementConfig } from '../config/movementConfig';
@@ -19,13 +24,13 @@ export interface Game3DConfig {
 
 export class Game3DScene {
   // Core Three.js components
-  private scene: THREE.Scene;
-  private camera: THREE.PerspectiveCamera;
-  private renderer: THREE.WebGLRenderer;
-  private clock: THREE.Clock;
+  private scene!: THREE.Scene;
+  private camera!: THREE.PerspectiveCamera;
+  private renderer!: THREE.WebGLRenderer;
+  private clock!: THREE.Clock;
   
   // Physics world
-  private physicsWorld: CANNON.World;
+  private physicsWorld!: CANNON.World;
   
   // Game systems
   private gameStore: GameStore;
@@ -35,6 +40,9 @@ export class Game3DScene {
   
   // Multiplayer
   private otherPlayers: Map<string, Character3D> = new Map();
+  
+  // Debug
+  private testCube: THREE.Mesh | null = null;
   
   // 3D Movement broadcasting
   private lastBroadcastPosition: THREE.Vector3 | null = null;
@@ -57,13 +65,18 @@ export class Game3DScene {
   
   // Camera controls
   private cameraTarget = new THREE.Vector3();
-  private cameraDistance = 15;
-  private cameraHeight = 10;
+  private cameraDistance = 12;
+  private cameraHeight = 10; // Higher angle while still focusing on head level
   private cameraAngle = Math.PI / 6; // 30 degrees
   private cameraRotationY = 0;
+  private cameraDebugLogged = false;
   
   constructor(config: Game3DConfig) {
     this.gameStore = GameStore.getInstance();
+    
+    // Initialize debug console
+    const debugConsole = DebugConsole.getInstance();
+    debugConsole.addLog('LOG', ['🎮 Initializing 3D Game Scene...']);
     
     this.initializeThreeJS(config);
     this.initializePhysics();
@@ -75,6 +88,8 @@ export class Game3DScene {
     this.animate();
     
     console.log('🎮 3D Game Scene initialized - Welcome to 3D HemoclastOnline!');
+    debugConsole.addLog('LOG', ['🎮 3D Game Scene initialized - Welcome to 3D HemoclastOnline!']);
+    debugConsole.addLog('LOG', ['💡 Press ~ (tilde) to toggle this debug console']);
   }
   
   private initializeThreeJS(config: Game3DConfig): void {
@@ -209,12 +224,14 @@ export class Game3DScene {
       if (guestCharacter) {
         try {
           characterData = JSON.parse(guestCharacter);
-          console.log('✅ Using guest character for 3D world:', characterData.name);
+          console.log('✅ Using guest character for 3D world:', characterData?.name);
           // Update game store with guest character data
-          gameState.setCharacter(characterData);
-          // Also store in localStorage for NetworkManager access
-          localStorage.setItem('hemoclast_character_data', JSON.stringify(characterData));
-          console.log('🎭 Stored guest character data in gameStore and localStorage:', characterData.name);
+          if (characterData) {
+            gameState.setCharacter(characterData);
+            // Also store in localStorage for NetworkManager access
+            localStorage.setItem('hemoclast_character_data', JSON.stringify(characterData));
+            console.log('🎭 Stored guest character data in gameStore and localStorage:', characterData.name);
+          }
         } catch (e) {
           console.warn('Failed to parse guest character data:', e);
         }
@@ -228,22 +245,76 @@ export class Game3DScene {
         id: 999,
         name: 'Test Character',
         characterClass: 'warrior',
-        level: 1
+        level: 1,
+        experience: 0,
+        stats: { strength: 10, agility: 10, intelligence: 10, vitality: 10 }
       };
     }
     
+    // Test Character3D class loading
+    console.log('🧪 SCENE: Testing Character3D class...');
+    console.log('🧪 SCENE: Character3D type:', typeof Character3D);
+    console.log('🧪 SCENE: Character3D:', Character3D);
+    
+    try {
+      Character3D.test();
+      console.log('🧪 SCENE: Character3D.test() completed successfully');
+    } catch (error) {
+      console.error('❌ SCENE: Character3D.test() failed:', error);
+    }
+    
     // Create 3D character with enhanced procedural models
-    this.character = new Character3D({
-      scene: this.scene,
-      physicsWorld: this.physicsWorld,
+    console.log('🎬 SCENE: About to create Character3D with data:', {
       name: characterData.name || 'Player',
       characterClass: characterData.characterClass || 'warrior',
-      position: new THREE.Vector3(0, 1, 0), // Start above ground
-      useAssets: false, // Use procedural models for now (GLTF models not available)
-      camera: this.camera // Pass camera for nameplate facing
+      useAssets: true,
+      position: { x: 0, y: 1, z: 0 }
     });
     
-    console.log('✨ Created 3D character:', {
+    try {
+      const debugConsole = DebugConsole.getInstance();
+      
+      console.log('🎬 SCENE: Attempting Character3D instantiation...');
+      console.log('🎬 SCENE: About to call new Character3D() constructor');
+      debugConsole.addLog('LOG', ['🎬 SCENE: Attempting Character3D instantiation...']);
+      debugConsole.addLog('LOG', ['🎬 SCENE: About to call new Character3D() constructor']);
+      
+      // Expose debug references
+      (window as any).debugScene = this.scene;
+      (window as any).debugCamera = this.camera;
+      
+      this.character = new Character3D({
+        scene: this.scene,
+        physicsWorld: this.physicsWorld,
+        name: characterData.name || 'Player',
+        characterClass: (characterData.characterClass || 'warrior') as 'warrior' | 'rogue' | 'mage',
+        position: new THREE.Vector3(0, 1, 0), // Start above ground
+        camera: this.camera // Pass camera for nameplate facing
+      });
+      
+      // Expose character for debugging
+      (window as any).debugCharacter = this.character;
+      
+      console.log('🎬 SCENE: Character3D instantiation successful');
+      debugConsole.addLog('LOG', ['🎬 SCENE: Character3D instantiation successful']);
+      
+      // Check if constructor was actually called
+      if ((window as any).CHARACTER3D_CONSTRUCTOR_CALLED) {
+        console.log('✅ SCENE: Constructor was called successfully');
+        debugConsole.addLog('LOG', ['✅ SCENE: Constructor was called successfully']);
+      } else {
+        console.log('❌ SCENE: Constructor was NEVER called - this is the bug!');
+        debugConsole.addLog('ERROR', ['❌ SCENE: Constructor was NEVER called - this is the bug!']);
+      }
+      
+    } catch (error) {
+      console.error('❌ SCENE: Failed to create Character3D:', error);
+      console.error('❌ SCENE: Error stack:', (error as Error).stack);
+      throw error;
+    }
+    
+    console.log('✨ SCENE: Character3D constructor completed. Character object created.');
+    console.log('✨ SCENE: Created 3D character:', {
       name: characterData.name,
       class: characterData.characterClass,
       level: characterData.level
@@ -252,6 +323,14 @@ export class Game3DScene {
     // Set camera to follow character
     this.cameraTarget.copy(this.character.getPosition());
     this.updateCameraPosition();
+    
+    // Debug cube removed
+    
+    // Debug: Log scene contents
+    console.log(`🔍 SCENE: Scene now has ${this.scene.children.length} children:`);
+    this.scene.children.forEach((child, index) => {
+      console.log(`  ${index}: ${child.type} - ${child.name || 'unnamed'} - visible: ${child.visible}`);
+    });
   }
   
   private initializeInput(): void {
@@ -428,9 +507,11 @@ export class Game3DScene {
   private updateCameraPosition(): void {
     if (!this.character) return;
     
-    // Smooth camera following
+    // Smooth camera following - focus on character center/head
     const characterPos = this.character.getPosition();
-    this.cameraTarget.lerp(characterPos, 0.05);
+    const characterCenter = characterPos.clone();
+    characterCenter.y += 2; // Focus on character center (head level for 2x scaled character)
+    this.cameraTarget.lerp(characterCenter, 0.05);
     
     // Calculate camera position based on target, distance, height, and rotation
     const cameraX = this.cameraTarget.x + Math.sin(this.cameraRotationY) * this.cameraDistance;
@@ -439,6 +520,14 @@ export class Game3DScene {
     
     this.camera.position.set(cameraX, cameraY, cameraZ);
     this.camera.lookAt(this.cameraTarget);
+    
+    // Debug camera positioning once
+    if (!this.cameraDebugLogged) {
+      console.log(`📷 Camera positioned at: (${cameraX.toFixed(1)}, ${cameraY.toFixed(1)}, ${cameraZ.toFixed(1)})`);
+      console.log(`📷 Camera looking at: (${this.cameraTarget.x.toFixed(1)}, ${this.cameraTarget.y.toFixed(1)}, ${this.cameraTarget.z.toFixed(1)})`);
+      console.log(`📷 Character position: (${characterPos.x.toFixed(1)}, ${characterPos.y.toFixed(1)}, ${characterPos.z.toFixed(1)})`);
+      this.cameraDebugLogged = true;
+    }
   }
   
   private handlePlayerJoined(playerData: any): void {
@@ -483,7 +572,6 @@ export class Game3DScene {
       name: characterName,
       characterClass: playerData.character_class || 'warrior',
       position: new THREE.Vector3(spawnX, 1, spawnZ),
-      useAssets: false, // Use procedural models for consistency
       camera: this.camera // Pass camera for nameplate facing
     });
     
@@ -683,6 +771,12 @@ export class Game3DScene {
     // Update character
     if (this.character) {
       this.character.update(deltaTime);
+      
+      // Update test cube to follow character (directly under nameplate)
+      if (this.testCube) {
+        const charPos = this.character.getPosition();
+        this.testCube.position.set(charPos.x, charPos.y, charPos.z); // Same position as character
+      }
       
       // Broadcast movement if character is moving or position changed
       this.broadcastMovementIfNeeded();

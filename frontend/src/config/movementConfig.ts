@@ -22,7 +22,7 @@ export class MovementConfig {
   /**
    * Get the movement speed for a character type
    */
-  public static getMovementSpeed(characterClass?: string): number {
+  public static getMovementSpeed(_characterClass?: string): number {
     // Could vary by class in the future
     return MovementConfig.BASE_MOVE_SPEED;
   }
