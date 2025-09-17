@@ -48,6 +48,7 @@ export class NetworkManager3D {
   private lastBroadcastPosition: THREE.Vector3 | null = null;
   private lastBroadcastRotation: THREE.Quaternion | null = null;
   private lastBroadcastTime = 0;
+  private lastBroadcastAnimation: string = '';
   private readonly BROADCAST_INTERVAL = MovementConfig.NETWORK_UPDATE_INTERVAL; // Use centralized timing
   private readonly MIN_POSITION_CHANGE = MovementConfig.MIN_MOVEMENT_THRESHOLD; // Use centralized threshold
   private readonly MIN_ROTATION_CHANGE = 0.05; // radians - rotation threshold
@@ -255,12 +256,15 @@ export class NetworkManager3D {
     
     const currentTime = Date.now();
     
-    // Check if enough time has passed since last broadcast
-    if (currentTime - this.lastBroadcastTime < this.BROADCAST_INTERVAL) {
-      return;
+    // Check if animation state changed - bypass throttling for animation changes
+    const animationChanged = animation !== this.lastBroadcastAnimation;
+    
+    // Check if enough time has passed since last broadcast (unless animation changed)
+    if (!animationChanged && currentTime - this.lastBroadcastTime < this.BROADCAST_INTERVAL) {
+      return; // Silent throttling for non-animation updates
     }
     
-    // Check if position or rotation has changed significantly
+    // Check if position or rotation has changed significantly, or animation changed
     let shouldBroadcast = false;
     
     if (!this.lastBroadcastPosition || !this.lastBroadcastRotation) {
@@ -269,12 +273,16 @@ export class NetworkManager3D {
       const positionChange = position.distanceTo(this.lastBroadcastPosition);
       const rotationChange = Math.abs(rotation.angleTo(this.lastBroadcastRotation));
       
-      if (positionChange > this.MIN_POSITION_CHANGE || rotationChange > this.MIN_ROTATION_CHANGE) {
+      if (positionChange > this.MIN_POSITION_CHANGE || rotationChange > this.MIN_ROTATION_CHANGE || animationChanged) {
         shouldBroadcast = true;
       }
     }
     
     if (shouldBroadcast) {
+      // Only log animation state changes, not regular position updates
+      if (animationChanged) {
+        console.log(`🎭 NETWORK: Broadcasting animation change: ${this.lastBroadcastAnimation} → ${animation}`);
+      }
       const gameState = this.gameStore.store.getState();
       let characterName = gameState.currentCharacter?.name;
       
@@ -324,6 +332,7 @@ export class NetworkManager3D {
       this.lastBroadcastPosition = position.clone();
       this.lastBroadcastRotation = rotation.clone();
       this.lastBroadcastTime = currentTime;
+      this.lastBroadcastAnimation = animation;
     }
   }
   

@@ -52,6 +52,7 @@ export class Game3DScene {
   private isMoving3D: boolean = false; // Track movement state for broadcasting
   private readonly MIN_MOVEMENT_DISTANCE = MovementConfig.MIN_MOVEMENT_THRESHOLD; // Use centralized threshold
   private readonly MAX_BROADCAST_DELAY = MovementConfig.NETWORK_UPDATE_INTERVAL * 4; // 4x the update interval
+  private lastAnimationBroadcastTime: number = 0; // Track animation-triggered broadcasts
   
   // Input handling
   private keys: { [key: string]: boolean } = {};
@@ -290,7 +291,12 @@ export class Game3DScene {
         characterClass: (characterData.characterClass || 'warrior') as 'warrior' | 'rogue' | 'mage',
         position: new THREE.Vector3(0, 1, 0), // Start above ground
         camera: this.camera, // Pass camera for nameplate facing
-        terrainMesh: this.environment?.terrain || null // Pass terrain mesh for height detection
+        terrainMesh: this.environment?.terrain || undefined, // Pass terrain mesh for height detection
+        onAnimationStateChanged: () => {
+          // Force immediate broadcast when animation state changes
+          this.lastAnimationBroadcastTime = Date.now();
+          this.broadcastMovementIfNeeded();
+        }
       });
       
       // Expose character for debugging
@@ -498,12 +504,12 @@ export class Game3DScene {
     // Update movement state
     this.isMoving3D = characterIsMoving;
     
-    // Log state changes only (not every frame)
-    if (characterIsMoving && !wasMoving) {
-      console.log('🎮 Movement started');
-    } else if (!characterIsMoving && wasMoving) {
-      console.log('🛑 Movement stopped');
+    // Log movement state changes
+    if (characterIsMoving !== wasMoving) {
+      const newState = characterIsMoving ? 'moving' : 'stopped';
+      console.log(`🎭 MOVEMENT: Player ${newState}`);
     }
+    
   }
   
   private updateCameraPosition(): void {
@@ -575,7 +581,7 @@ export class Game3DScene {
       characterClass: playerData.character_class || 'warrior',
       position: new THREE.Vector3(spawnX, 1, spawnZ),
       camera: this.camera, // Pass camera for nameplate facing
-      terrainMesh: this.environment?.terrain || null // Pass terrain mesh for height detection
+      terrainMesh: this.environment?.terrain || undefined // Pass terrain mesh for height detection
     });
     
     // Keep other players fully opaque (no transparency)
@@ -615,7 +621,10 @@ export class Game3DScene {
     // Apply animation state FIRST (determines movement behavior)
     if (playerData.animation) {
       console.log(`🎭 Setting animation state for ${playerData.character_name}: ${playerData.animation}`);
-      otherPlayer.setAnimationState(playerData.animation as 'idle' | 'walking' | 'running', true);
+      if (playerData.animation === 'idle') {
+        console.log(`🛑 MULTIPLAYER: Player ${playerData.character_name} stopped moving - setting idle animation`);
+      }
+      otherPlayer.setAnimationState(playerData.animation as 'idle' | 'walking' | 'running');
     }
     
     // Update rotation with smooth interpolation - convert quaternion to Euler properly
@@ -696,6 +705,7 @@ export class Game3DScene {
       else if (movementStateChanged) {
         shouldBroadcast = true;
         broadcastReason = isCharacterMoving ? 'started_moving' : 'stopped_moving';
+        console.log(`🎭 MOVEMENT STATE CHANGE: ${broadcastReason} - will broadcast animation state`);
       }
       // 4. Maximum time delay reached - BUT ONLY when actively moving
       else if (isCharacterMoving && timeSinceLastBroadcast >= this.MAX_BROADCAST_DELAY) {
@@ -719,6 +729,11 @@ export class Game3DScene {
       // Get current animation state from character
       const animationState = this.character.getCurrentAnimationState();
       
+      // Only log animation state for significant movement changes
+      if (broadcastReason === 'stopped_moving' || broadcastReason === 'started_moving') {
+        console.log(`🎭 MOVEMENT: ${broadcastReason} - animation: ${animationState}`);
+      }
+      
       // Broadcast the update
       this.networkManager.broadcastPlayerUpdate(
         currentPosition, 
@@ -726,9 +741,9 @@ export class Game3DScene {
         animationState
       );
       
-      // Only log significant broadcasts to reduce console spam
+      // Only log initial and significant movement state changes
       if (broadcastReason === 'initial' || broadcastReason === 'started_moving' || broadcastReason === 'stopped_moving') {
-        console.log(`📡 Broadcasting 3D position: (${currentPosition.x.toFixed(1)}, ${currentPosition.y.toFixed(1)}, ${currentPosition.z.toFixed(1)}) - ${animationState} [${broadcastReason}]`);
+        console.log(`📡 Broadcasting: ${animationState} [${broadcastReason}]`);
       }
     }
   }
@@ -785,7 +800,11 @@ export class Game3DScene {
     this.updateMovementState();
     
     // Broadcast movement if character is moving or position changed
-    this.broadcastMovementIfNeeded();
+    // Skip if an animation-triggered broadcast happened very recently (within 100ms)
+    const timeSinceAnimationBroadcast = Date.now() - this.lastAnimationBroadcastTime;
+    if (timeSinceAnimationBroadcast > 100) {
+      this.broadcastMovementIfNeeded();
+    }
     }
     
     // Update other players

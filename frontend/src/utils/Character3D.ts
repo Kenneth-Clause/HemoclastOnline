@@ -18,6 +18,7 @@ export interface Character3DConfig {
   modelPath?: string;
   camera?: THREE.Camera;
   terrainMesh?: THREE.Mesh; // Optional terrain mesh for height detection
+  onAnimationStateChanged?: (newState: 'idle' | 'walking' | 'running') => void; // Callback for animation state changes
 }
 
 export class Character3D {
@@ -50,6 +51,7 @@ export class Character3D {
   private camera: THREE.Camera | null = null;
   private name: string;
   private characterClass: string;
+  private onAnimationStateChanged?: (newState: 'idle' | 'walking' | 'running') => void;
   
   // Terrain following
   private raycaster: THREE.Raycaster = new THREE.Raycaster();
@@ -73,6 +75,7 @@ export class Character3D {
     this.characterClass = config.characterClass;
     this.camera = config.camera || null;
     this.terrainMesh = config.terrainMesh || null;
+    this.onAnimationStateChanged = config.onAnimationStateChanged;
     
     // Create main group for character
     this.group = new THREE.Group();
@@ -389,8 +392,10 @@ export class Character3D {
     // Update animation only when movement state actually changes
     if (this.isMoving && !wasMoving) {
       this.playAnimation('walking');
+      console.log(`🏃 MOVEMENT: ${this.name} started moving - animation: walking`);
     } else if (!this.isMoving && wasMoving) {
       this.playAnimation('idle');
+      console.log(`🛑 MOVEMENT: ${this.name} stopped moving - animation: idle`);
     }
   }
   
@@ -483,10 +488,14 @@ export class Character3D {
         velocity.z = direction.z * this.moveSpeed;
       } else {
         // Close to target - stop immediately with no deceleration
+        const wasMoving = this.targetPosition !== null || this.isMoving;
         this.targetPosition = null;
         this.isMoving = false;
         this.physicsBody.velocity.set(0, 0, 0);
         this.playAnimation('idle');
+        if (wasMoving) {
+          console.log(`🛑 CLICK-TO-MOVE: ${this.name} reached target - animation: idle`);
+        }
       }
     } else if (this.movementDirection.length() > 0) {
       // Keyboard movement
@@ -588,6 +597,11 @@ export class Character3D {
     this.animationState = animationName;
     
     console.log(`🎭 Playing animation: ${targetAnimName} (transition from ${previousAction?.getClip().name || 'none'})`);
+    
+    // Notify about animation state change for immediate network broadcasting
+    if (this.onAnimationStateChanged) {
+      this.onAnimationStateChanged(animationName);
+    }
   }
   
   // Public API methods
@@ -673,6 +687,20 @@ export class Character3D {
   public setTerrainMesh(terrainMesh: THREE.Mesh | null): void {
     this.terrainMesh = terrainMesh;
     console.log(`🏔️ Terrain mesh ${terrainMesh ? 'set' : 'cleared'} for character ${this.name}`);
+  }
+  
+  public setSmoothPosition(targetPosition: THREE.Vector3): void {
+    // For multiplayer replication, set position directly
+    // Future enhancement: could add smooth interpolation here
+    this.setPosition(targetPosition);
+    console.log(`📍 MULTIPLAYER: Set position for ${this.name} to (${targetPosition.x.toFixed(2)}, ${targetPosition.y.toFixed(2)}, ${targetPosition.z.toFixed(2)})`);
+  }
+  
+  public setSmoothRotation(targetRotation: THREE.Euler): void {
+    // For multiplayer replication, set rotation directly
+    // Future enhancement: could add smooth interpolation here
+    this.setRotation(targetRotation);
+    console.log(`🔄 MULTIPLAYER: Set rotation for ${this.name} to Y=${targetRotation.y.toFixed(2)}`);
   }
   
   public debugAnimationState(): void {
