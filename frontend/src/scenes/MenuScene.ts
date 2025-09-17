@@ -102,6 +102,9 @@ export class MenuScene extends Scene {
     // Main menu buttons with responsive layout
     this.createResponsiveMenuButtons(buttonLayout, width, height);
     
+    // Add 3D Test button for easy access
+    this.create3DTestButton(width, height);
+    
     // Footer text removed as requested
   }
 
@@ -119,6 +122,44 @@ export class MenuScene extends Scene {
       this.particles.destroy();
       this.particles = null;
     }
+  }
+
+  private create3DTestButton(width: number, height: number): void {
+    // Create a prominent "NEW 3D ENGINE" badge
+    const newBadge = this.add.text(width - 120, 60, '✨ NEW 3D ENGINE ✨', {
+      fontSize: '16px',
+      color: '#FFD700',
+      fontFamily: 'Cinzel, serif',
+      fontStyle: 'bold',
+      backgroundColor: '#4B0082',
+      padding: { x: 12, y: 6 },
+      stroke: '#FFFFFF',
+      strokeThickness: 1
+    })
+    .setOrigin(0.5);
+    
+    this.menuElements.push(newBadge);
+    
+    // Add a subtitle
+    const subtitleText = this.add.text(width - 120, 85, 'Experience the future of\nHemoclastOnline!', {
+      fontSize: '12px',
+      color: '#F5F5DC',
+      fontFamily: 'Cinzel, serif',
+      align: 'center'
+    }).setOrigin(0.5);
+    
+    this.menuElements.push(subtitleText);
+    
+    // Add pulsing animation to make it more noticeable
+    this.tweens.add({
+      targets: newBadge,
+      scaleX: 1.1,
+      scaleY: 1.1,
+      duration: 1000,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
   }
 
   // Public method called by main.ts on resize

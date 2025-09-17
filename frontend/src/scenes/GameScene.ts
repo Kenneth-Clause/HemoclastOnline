@@ -357,7 +357,32 @@ export class GameScene extends Scene {
         shadowEffect: true
       }
     );
-    // Menu button is already created with fixed positioning
+    
+    // 3D Test button (top-left, below menu button)
+    GothicTitleUtils.createEnhancedGothicButton(
+      this,
+      80,
+      80,
+      140,
+      30,
+      '🎮 Try 3D Mode',
+      () => {
+        console.log('🚀 Switching to 3D Test Scene');
+        this.scene.stop('UIScene');
+        this.scene.start('Game3DTestScene');
+      },
+      {
+        fontSize: 12,
+        bgColor: 0x4B0082,
+        borderColor: 0x8A2BE2,
+        textColor: '#F5F5DC',
+        hoverBgColor: 0x6A0DAD,
+        hoverBorderColor: 0xDDA0DD,
+        hoverTextColor: '#FFD700',
+        glowEffect: true,
+        shadowEffect: true
+      }
+    );
   }
 
   private createAtmosphericEffects(): void {

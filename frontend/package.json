@@ -11,9 +11,12 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@types/three": "^0.160.0",
+    "axios": "^1.6.2",
+    "cannon-es": "^0.20.0",
     "phaser": "^3.70.0",
-    "zustand": "^4.4.7",
-    "axios": "^1.6.2"
+    "three": "^0.160.0",
+    "zustand": "^4.4.7"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

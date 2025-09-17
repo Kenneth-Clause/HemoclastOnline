@@ -1020,10 +1020,10 @@ export class CharacterSelectionScene extends Scene {
       return;
     }
     
-    // Go to the game world
+    // Go directly to the 3D game world instead of 2D
+    console.log('🚀 Entering 3D world with character:', selectedCharacterId);
     this.cleanupForm();
-    this.scene.start('GameScene');
-    this.scene.launch('UIScene');
+    this.scene.start('Game3DTestScene');
   }
   
   private goToSettings() {

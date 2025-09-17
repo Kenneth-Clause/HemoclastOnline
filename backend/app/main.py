@@ -181,43 +181,53 @@ async def handle_game_message(client_id: str, message: dict):
     """Handle different types of game messages"""
     message_type = message.get("type")
     
-    if message_type == "player_spawn":
-        # Store player data
+    if message_type in ["player_spawn", "player_spawn_3d"]:
+        # Store player data (works for both 2D and 3D)
         player_data = message.get("data", {})
         connection_manager.store_player_data(client_id, player_data)
+        
+        # Determine response type based on input type
+        response_type = "player_joined_3d" if message_type == "player_spawn_3d" else "player_joined"
+        
+        print(f"🎭 BACKEND: Player {player_data.get('character_name')} spawning with type {message_type}")
         
         # Send existing players to the new player
         existing_players = connection_manager.get_all_players()
         for existing_client_id, existing_data in existing_players.items():
             if existing_client_id != client_id:  # Don't send self
                 existing_player_message = {
-                    "type": "player_joined",
+                    "type": response_type,
                     "data": {
                         "client_id": existing_client_id,
                         **existing_data
                     }
                 }
                 await connection_manager.send_personal_message(existing_player_message, client_id)
+                print(f"📤 BACKEND: Sent existing player {existing_data.get('character_name')} to new player")
         
         # Notify other players of new player spawn
         spawn_notification = {
-            "type": "player_joined",
+            "type": response_type,
             "data": {
                 "client_id": client_id,
                 **player_data
             }
         }
         await connection_manager.broadcast_to_others(json.dumps(spawn_notification), client_id)
+        print(f"📡 BACKEND: Broadcasted new player {player_data.get('character_name')} to {len(existing_players)} other players")
         
-    elif message_type == "player_move":
-        # Update stored player position
+    elif message_type in ["player_move", "player_move_3d"]:
+        # Update stored player position (works for both 2D and 3D)
         move_data = message.get("data", {})
         if client_id in connection_manager.player_data:
             connection_manager.player_data[client_id].update(move_data)
         
+        # Determine response type based on input type
+        response_type = "player_moved_3d" if message_type == "player_move_3d" else "player_moved"
+        
         # Broadcast player movement to other players
         move_notification = {
-            "type": "player_moved",
+            "type": response_type,
             "data": {
                 "client_id": client_id,
                 **move_data
