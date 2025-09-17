@@ -17,6 +17,7 @@ export interface Character3DConfig {
   position: THREE.Vector3;
   modelPath?: string;
   camera?: THREE.Camera;
+  terrainMesh?: THREE.Mesh; // Optional terrain mesh for height detection
 }
 
 export class Character3D {
@@ -42,6 +43,7 @@ export class Character3D {
   private isMoving = false;
   private movementDirection = new THREE.Vector3();
   private targetPosition: THREE.Vector3 | null = null;
+  private moveStartTime: number = 0; // Track when movement started
   
   // References
   private scene: THREE.Scene;
@@ -49,6 +51,10 @@ export class Character3D {
   private camera: THREE.Camera | null = null;
   private name: string;
   private characterClass: string;
+  
+  // Terrain following
+  private raycaster: THREE.Raycaster = new THREE.Raycaster();
+  private terrainMesh: THREE.Mesh | null = null;
 
   constructor(config: Character3DConfig) {
     const debugConsole = DebugConsole.getInstance();
@@ -60,6 +66,7 @@ export class Character3D {
     this.name = config.name;
     this.characterClass = config.characterClass;
     this.camera = config.camera || null;
+    this.terrainMesh = config.terrainMesh || null;
     
     // Create main group for character
     this.group = new THREE.Group();
@@ -180,7 +187,7 @@ export class Character3D {
     });
     this.nameplate = new THREE.Sprite(material);
     this.nameplate.position.y = 3.5; // Closer to character
-    this.nameplate.scale.set(2.65, 1.15, 1); // Just a bit bigger for better visibility
+    this.nameplate.scale.set(2.75, 1.15, 1); // Just a bit bigger for better visibility
     
     this.group.add(this.nameplate);
     console.log(`🏷️ Created enhanced nameplate for ${cleanName}`);
@@ -209,7 +216,7 @@ export class Character3D {
     const minY = boundingBox.min.y;
     
     // Position so feet are just above ground level
-    this.model.position.set(0, -minY - 0.1, 0); // Raise character up to proper ground level
+    this.model.position.set(0, -minY - 0, 0); // Raise character up to proper ground level
     
     console.log(`🔧 FINAL: Positioned character after animation setup - height: ${modelHeight.toFixed(2)}, y: ${(-minY - 0.85).toFixed(2)}`);
   }
@@ -270,15 +277,16 @@ export class Character3D {
     // Cancel click-to-move if keyboard input
     if (this.isMoving && this.targetPosition) {
       this.targetPosition = null;
+      console.log('🎮 Cancelled click-to-move due to keyboard input');
     }
     
-    // Face movement direction
+    // Face movement direction smoothly
     if (this.isMoving) {
       const angle = Math.atan2(direction.x, direction.z);
-      this.group.rotation.y = angle;
+      this.group.rotation.y = angle; // Direct for keyboard input responsiveness
     }
     
-    // Update animation
+    // Update animation only when movement state actually changes
     if (this.isMoving && !wasMoving) {
       this.playAnimation('walking');
     } else if (!this.isMoving && wasMoving) {
@@ -288,8 +296,23 @@ export class Character3D {
   
   public moveToPosition(targetPosition: THREE.Vector3): void {
     this.targetPosition = targetPosition.clone();
-    this.targetPosition.y = 1;
-    this.playAnimation('walking');
+    
+    // Use terrain height instead of fixed Y value
+    const terrainHeight = this.getTerrainHeight(targetPosition.x, targetPosition.z);
+    this.targetPosition.y = terrainHeight + 1; // Character height above terrain
+    
+    this.moveStartTime = Date.now(); // Track when movement started
+    
+    // Cancel any keyboard movement
+    this.movementDirection.set(0, 0, 0);
+    this.isMoving = true; // Set to true since we're starting click-to-move
+    
+    // Start walking animation (only if not already walking)
+    if (this.animationState !== 'walking') {
+      this.playAnimation('walking');
+    }
+    
+    console.log(`🖱️ Click-to-move target set: (${targetPosition.x.toFixed(1)}, ${this.targetPosition.y.toFixed(1)}, ${targetPosition.z.toFixed(1)}) [terrain: ${terrainHeight.toFixed(2)}]`);
   }
   
   public update(deltaTime: number): void {
@@ -304,13 +327,23 @@ export class Character3D {
     // Sync physics to visual
     this.syncPhysicsToVisual();
     
+    // Safety check: ensure animation state matches actual movement state
+    const shouldBeMoving = this.targetPosition !== null || this.movementDirection.length() > 0;
+    if (shouldBeMoving && this.animationState === 'idle') {
+      console.log('🔧 Animation state correction: should be walking but is idle');
+      this.playAnimation('walking');
+    } else if (!shouldBeMoving && this.animationState === 'walking') {
+      console.log('🔧 Animation state correction: should be idle but is walking');
+      this.playAnimation('idle');
+    }
+    
     // Update nameplate to face camera
     if (this.nameplate && this.camera) {
       this.nameplate.lookAt(this.camera.position);
     }
   }
   
-  private updateMovement(_deltaTime: number): void {
+  private updateMovement(deltaTime: number): void {
     if (!this.physicsBody) return;
     
     const velocity = new CANNON.Vec3(0, 0, 0);
@@ -321,16 +354,51 @@ export class Character3D {
       const direction = new THREE.Vector3().subVectors(this.targetPosition, currentPos);
       const distance = direction.length();
       
-      if (distance > 0.5) {
+      if (distance > 0.1) { // Reduced threshold for smoother arrival
         direction.normalize();
+        
+        // Smooth rotation towards target
+        const targetAngle = Math.atan2(direction.x, direction.z);
+        const currentAngle = this.group.rotation.y;
+        const angleDiff = Math.atan2(Math.sin(targetAngle - currentAngle), Math.cos(targetAngle - currentAngle));
+        this.group.rotation.y += angleDiff * Math.min(deltaTime * 8, 1); // Smooth rotation
+        
+        // Apply movement velocity
         velocity.x = direction.x * this.moveSpeed;
         velocity.z = direction.z * this.moveSpeed;
+        
+        // Ensure walking animation is playing
+        if (this.animationState !== 'walking') {
+          this.playAnimation('walking');
+        }
       } else {
-        // Reached target
-        this.group.position.copy(this.targetPosition);
-        this.physicsBody.position.set(this.targetPosition.x, this.targetPosition.y, this.targetPosition.z);
-        this.targetPosition = null;
-        this.playAnimation('idle');
+        // We're close to target - start final approach
+        const lerpFactor = Math.min(deltaTime * 10, 1); // Smooth final approach
+        const oldPosition = this.group.position.clone();
+        this.group.position.lerp(this.targetPosition, lerpFactor);
+        this.physicsBody.position.set(this.group.position.x, this.group.position.y, this.group.position.z);
+        
+        // Check if we've actually moved very little (indicating we've reached the target)
+        const positionChange = oldPosition.distanceTo(this.group.position);
+        
+        // Safety timeout: if movement takes too long, force stop (prevents stuck walking animation)
+        const movementDuration = Date.now() - this.moveStartTime;
+        const maxMovementTime = 30000; // 30 seconds maximum
+        
+        // Stop when we're very close to target OR when position barely changes between frames OR timeout
+        if (distance < 0.05 || positionChange < 0.01 || movementDuration > maxMovementTime) {
+          this.targetPosition = null;
+          this.isMoving = false; // Update movement state
+          this.playAnimation('idle');
+          // Zero out velocity to ensure complete stop
+          this.physicsBody.velocity.set(0, 0, 0);
+          
+          if (movementDuration > maxMovementTime) {
+            console.log('⏰ Click-to-move timeout - forcing stop and idle animation');
+          } else {
+            console.log('🛑 Reached click-to-move destination, switching to idle');
+          }
+        }
       }
     } else if (this.movementDirection.length() > 0) {
       // Keyboard movement
@@ -347,16 +415,43 @@ export class Character3D {
   private syncPhysicsToVisual(): void {
     if (!this.physicsBody) return;
     
-    // Simple sync - just copy physics position to group
+    // Get terrain height at character position
+    const terrainHeight = this.getTerrainHeight(this.physicsBody.position.x, this.physicsBody.position.z);
+    
+    // Sync position with terrain following
     this.group.position.set(
       this.physicsBody.position.x,
-      Math.max(0, this.physicsBody.position.y),
+      Math.max(terrainHeight, this.physicsBody.position.y), // Follow terrain or physics, whichever is higher
       this.physicsBody.position.z
     );
   }
   
+  /**
+   * Get the terrain height at a specific X,Z position using raycasting
+   */
+  private getTerrainHeight(x: number, z: number): number {
+    if (!this.terrainMesh) {
+      return 0; // Default ground level if no terrain mesh
+    }
+    
+    // Cast ray downward from high above the position
+    const rayOrigin = new THREE.Vector3(x, 100, z); // Start ray from high above
+    const rayDirection = new THREE.Vector3(0, -1, 0); // Point downward
+    
+    this.raycaster.set(rayOrigin, rayDirection);
+    const intersects = this.raycaster.intersectObject(this.terrainMesh);
+    
+    if (intersects.length > 0) {
+      // Return the Y coordinate of the intersection point
+      return intersects[0].point.y;
+    }
+    
+    // If no intersection found, return default ground level
+    return 0;
+  }
+  
   private playAnimation(animationName: 'idle' | 'walking' | 'running'): void {
-    if (!this.mixer) return;
+    if (!this.mixer || this.animationState === animationName) return;
     
     // Map to Quaternius animation names
     const animationMap = {
@@ -368,19 +463,46 @@ export class Character3D {
     const targetAnimName = animationMap[animationName];
     const targetClip = this.animations.find(clip => clip.name === targetAnimName);
     
-    if (!targetClip) return;
-    
-    // Fade out current animation
-    if (this.currentAction) {
-      this.currentAction.fadeOut(0.3);
+    if (!targetClip) {
+      console.warn(`❌ Animation not found: ${targetAnimName}`);
+      return;
     }
     
-    // Fade in new animation
-    this.currentAction = this.mixer.clipAction(targetClip);
-    this.currentAction.reset().fadeIn(0.3).play();
+    const previousAction = this.currentAction;
+    const newAction = this.mixer.clipAction(targetClip);
+    
+    // Configure new animation
+    newAction.reset();
+    newAction.setEffectiveWeight(1.0);
+    newAction.setEffectiveTimeScale(1.0);
+    newAction.enabled = true;
+    newAction.clampWhenFinished = false;
+    newAction.loop = THREE.LoopRepeat;
+    
+    // Handle transition
+    if (previousAction && previousAction !== newAction) {
+      // Smooth crossfade between animations
+      const fadeTime = 0.2; // Shorter fade for more responsive feel
+      
+      previousAction.fadeOut(fadeTime);
+      newAction.fadeIn(fadeTime);
+      
+      // Ensure previous action stops completely after fade
+      setTimeout(() => {
+        if (previousAction && previousAction !== this.currentAction) {
+          previousAction.stop();
+          previousAction.enabled = false;
+        }
+      }, fadeTime * 1000 + 50); // Small buffer to ensure fade completes
+    } else {
+      newAction.setEffectiveWeight(1.0);
+    }
+    
+    newAction.play();
+    this.currentAction = newAction;
     this.animationState = animationName;
     
-    console.log(`🎭 Playing animation: ${targetAnimName}`);
+    console.log(`🎭 Playing animation: ${targetAnimName} (transition from ${previousAction?.getClip().name || 'none'})`);
   }
   
   // Public API methods
@@ -416,7 +538,8 @@ export class Character3D {
   }
   
   public isCurrentlyMoving(): boolean {
-    return this.isMoving;
+    // Character is moving if either keyboard movement is active OR click-to-move target exists
+    return this.isMoving || this.targetPosition !== null;
   }
   
   public getCurrentAnimationState(): 'idle' | 'walking' | 'running' {
@@ -437,6 +560,11 @@ export class Character3D {
     if (this.animationState !== state) {
       this.playAnimation(state);
     }
+  }
+  
+  public setTerrainMesh(terrainMesh: THREE.Mesh | null): void {
+    this.terrainMesh = terrainMesh;
+    console.log(`🏔️ Terrain mesh ${terrainMesh ? 'set' : 'cleared'} for character ${this.name}`);
   }
   
   public destroy(): void {

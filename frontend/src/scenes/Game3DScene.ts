@@ -289,7 +289,8 @@ export class Game3DScene {
         name: characterData.name || 'Player',
         characterClass: (characterData.characterClass || 'warrior') as 'warrior' | 'rogue' | 'mage',
         position: new THREE.Vector3(0, 1, 0), // Start above ground
-        camera: this.camera // Pass camera for nameplate facing
+        camera: this.camera, // Pass camera for nameplate facing
+        terrainMesh: this.environment?.terrain || null // Pass terrain mesh for height detection
       });
       
       // Expose character for debugging
@@ -458,9 +459,11 @@ export class Game3DScene {
       const maxDistance = 90;
       targetPosition.x = Math.max(-maxDistance, Math.min(maxDistance, targetPosition.x));
       targetPosition.z = Math.max(-maxDistance, Math.min(maxDistance, targetPosition.z));
-      targetPosition.y = 1; // Keep character at ground level
       
-      console.log(`🖱️ CLICK DEBUG: Final target: (${targetPosition.x.toFixed(1)}, ${targetPosition.y}, ${targetPosition.z.toFixed(1)})`);
+      // Keep the Y coordinate from terrain intersection, don't override it
+      // The Character3D.moveToPosition() will handle terrain height detection
+      
+      console.log(`🖱️ CLICK DEBUG: Final target: (${targetPosition.x.toFixed(1)}, ${targetPosition.y.toFixed(1)}, ${targetPosition.z.toFixed(1)})`);
       
       // Move character to clicked position
       this.character.moveToPosition(targetPosition);
@@ -572,7 +575,8 @@ export class Game3DScene {
       name: characterName,
       characterClass: playerData.character_class || 'warrior',
       position: new THREE.Vector3(spawnX, 1, spawnZ),
-      camera: this.camera // Pass camera for nameplate facing
+      camera: this.camera, // Pass camera for nameplate facing
+      terrainMesh: this.environment?.terrain || null // Pass terrain mesh for height detection
     });
     
     // Keep other players fully opaque (no transparency)
