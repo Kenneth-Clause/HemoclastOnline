@@ -299,9 +299,38 @@ export class Game3DScene {
         }
       });
       
+      // Mark as main player (controls own movement)
+      this.character.setAsMainPlayer(true);
+      
       // Expose character for debugging
       (window as any).debugCharacter = this.character;
       (window as any).debugAnimationState = () => this.character?.debugAnimationState();
+      
+      // Expose interpolation controls for testing
+      (window as any).enableInterpolation = () => {
+        console.log(`🔧 DEBUG: Found ${this.otherPlayers.size} other players`);
+        this.otherPlayers.forEach((player, playerId) => {
+          console.log(`🔧 DEBUG: Enabling interpolation for player ${playerId}`);
+          player.setInterpolationEnabled(true);
+        });
+        console.log('🌐 Interpolation ENABLED for all players');
+      };
+      (window as any).disableInterpolation = () => {
+        console.log(`🔧 DEBUG: Found ${this.otherPlayers.size} other players`);
+        this.otherPlayers.forEach((player, playerId) => {
+          console.log(`🔧 DEBUG: Disabling interpolation for player ${playerId}`);
+          player.setInterpolationEnabled(false);
+        });
+        console.log('📍 Interpolation DISABLED for all players (direct positioning)');
+      };
+      
+      // Add a function to check current state
+      (window as any).checkPlayers = () => {
+        console.log(`🔧 DEBUG: Total other players: ${this.otherPlayers.size}`);
+        this.otherPlayers.forEach((player, playerId) => {
+          console.log(`🔧 DEBUG: Player ${playerId}: ${player.getName()}`);
+        });
+      };
       
       console.log('🎬 SCENE: Character3D instantiation successful');
       debugConsole.addLog('LOG', ['🎬 SCENE: Character3D instantiation successful']);

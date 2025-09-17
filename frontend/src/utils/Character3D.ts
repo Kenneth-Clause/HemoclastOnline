@@ -45,6 +45,12 @@ export class Character3D {
   private movementDirection = new THREE.Vector3();
   private targetPosition: THREE.Vector3 | null = null;
   
+  // Smooth interpolation for all networked players (enhancement overlay)
+  private networkTargetPosition: THREE.Vector3 | null = null;
+  private networkTargetRotation: THREE.Euler | null = null;
+  private interpolationEnabled: boolean = false; // Disabled by default - core networking works first
+  private isMainPlayer: boolean = false; // True for the player you control, false for other networked players
+  
   // References
   private scene: THREE.Scene;
   private physicsWorld: CANNON.World;
@@ -411,6 +417,7 @@ export class Character3D {
       this.mixer.update(deltaTime);
     }
     
+    
     // Gentle spawn protection: Only fix obvious issues
     if (!this.isFullyInitialized && this.animationState === 'walking' && !this.targetPosition && this.movementDirection.length() === 0) {
       console.log(`🔧 Gentle spawn protection: Fixing walking animation during spawn`);
@@ -418,11 +425,18 @@ export class Character3D {
       this.playAnimation('idle');
     }
     
-    // Handle movement
-    this.updateMovement(deltaTime);
+    // Handle movement - only main player controls their own movement
+    if (this.isMainPlayer) {
+      this.updateMovement(deltaTime);
+    }
     
-    // IMMEDIATE STOP CHECK: Additional safety check in main update loop (only after initialization)
-    if (this.isFullyInitialized && this.targetPosition && this.animationState === 'walking') {
+    // Handle smooth interpolation (enhancement overlay)
+    if (this.interpolationEnabled) {
+      this.updateNetworkInterpolation(deltaTime);
+    }
+    
+    // IMMEDIATE STOP CHECK: Only for main player (only after initialization)
+    if (this.isMainPlayer && this.isFullyInitialized && this.targetPosition && this.animationState === 'walking') {
       const currentPos = this.group.position;
       const targetDistance = currentPos.distanceTo(this.targetPosition);
       const currentVelocity = this.physicsBody.velocity.length();
@@ -438,12 +452,13 @@ export class Character3D {
       }
     }
     
-    // Sync physics to visual
-    this.syncPhysicsToVisual();
+    // Sync physics to visual - only for main player
+    if (this.isMainPlayer) {
+      this.syncPhysicsToVisual();
+    }
     
-    // Safety check: ensure animation state matches actual movement state (only after initialization)
-    // Only run this check very occasionally to avoid interfering with normal transitions
-    if (this.isFullyInitialized && Math.floor(Date.now() / 1000) % 5 === 0) { // Every 5 seconds, very infrequent
+    // Safety check: Only for main player - ensure animation state matches actual movement state
+    if (this.isMainPlayer && this.isFullyInitialized && Math.floor(Date.now() / 1000) % 5 === 0) { // Every 5 seconds, very infrequent
       const shouldBeMoving = this.targetPosition !== null || this.movementDirection.length() > 0;
       const actuallyMoving = this.physicsBody.velocity.length() > 0.1;
       
@@ -463,6 +478,51 @@ export class Character3D {
     // Update nameplate to face camera
     if (this.nameplate && this.camera) {
       this.nameplate.lookAt(this.camera.position);
+    }
+  }
+  
+  private updateNetworkInterpolation(deltaTime: number): void {
+    // Smooth interpolation enhancement
+    const lerpFactor = MovementConfig.getNetworkLerpFactor(deltaTime);
+    
+    // Interpolate position
+    if (this.networkTargetPosition) {
+      const currentPos = this.group.position;
+      const distance = currentPos.distanceTo(this.networkTargetPosition);
+      
+      if (distance > MovementConfig.MAX_INTERPOLATION_DISTANCE) {
+        // If too far, teleport to prevent sliding across map
+        this.group.position.copy(this.networkTargetPosition);
+        this.networkTargetPosition = null; // Clear target after teleport
+        console.log(`🚀 ${this.name}: Teleported to target (distance was ${distance.toFixed(2)})`);
+      } else if (distance > 0.05) {
+        // Smooth interpolation
+        this.group.position.lerp(this.networkTargetPosition, lerpFactor);
+      } else {
+        // Close enough - snap to target and clear
+        this.group.position.copy(this.networkTargetPosition);
+        this.networkTargetPosition = null;
+      }
+    }
+    
+    // Interpolate rotation
+    if (this.networkTargetRotation) {
+      const currentRot = this.group.rotation;
+      const targetQuat = new THREE.Quaternion().setFromEuler(this.networkTargetRotation);
+      const currentQuat = new THREE.Quaternion().setFromEuler(currentRot);
+      
+      // Check if rotation difference is significant
+      const rotationDifference = currentQuat.angleTo(targetQuat);
+      
+      if (rotationDifference > 0.05) {
+        // Smooth rotation interpolation
+        currentQuat.slerp(targetQuat, lerpFactor);
+        this.group.rotation.setFromQuaternion(currentQuat);
+      } else {
+        // Close enough - snap to target and clear
+        this.group.rotation.copy(this.networkTargetRotation);
+        this.networkTargetRotation = null;
+      }
     }
   }
   
@@ -610,6 +670,9 @@ export class Character3D {
   }
   
   public setPosition(position: THREE.Vector3): void {
+    // Debug: Log when position is being set directly
+    console.log(`🔧 POSITION: Setting ${this.name} position to (${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)})`);
+    
     this.group.position.copy(position);
     if (this.physicsBody) {
       this.physicsBody.position.copy(position as any);
@@ -689,19 +752,53 @@ export class Character3D {
     console.log(`🏔️ Terrain mesh ${terrainMesh ? 'set' : 'cleared'} for character ${this.name}`);
   }
   
+  public setInterpolationEnabled(enabled: boolean): void {
+    this.interpolationEnabled = enabled;
+    console.log(`🌐 ${this.name}: Interpolation ${enabled ? 'enabled' : 'disabled'}`);
+    
+    // Clear any pending interpolation targets when disabling
+    if (!enabled) {
+      this.networkTargetPosition = null;
+      this.networkTargetRotation = null;
+    }
+  }
+  
+  public setAsMainPlayer(isMain: boolean = true): void {
+    this.isMainPlayer = isMain;
+    console.log(`👤 ${this.name}: Set as ${isMain ? 'MAIN' : 'OTHER'} player`);
+  }
+  
   public setSmoothPosition(targetPosition: THREE.Vector3): void {
-    // For multiplayer replication, set position directly
-    // Future enhancement: could add smooth interpolation here
-    this.setPosition(targetPosition);
-    console.log(`📍 MULTIPLAYER: Set position for ${this.name} to (${targetPosition.x.toFixed(2)}, ${targetPosition.y.toFixed(2)}, ${targetPosition.z.toFixed(2)})`);
+    console.log(`🔧 DEBUG: setSmoothPosition called for ${this.name}, interpolation: ${this.interpolationEnabled}`);
+    
+    if (this.interpolationEnabled) {
+      // Set up smooth interpolation target
+      this.networkTargetPosition = targetPosition.clone();
+      console.log(`🌐 ${this.name}: Set interpolation target (${targetPosition.x.toFixed(2)}, ${targetPosition.y.toFixed(2)}, ${targetPosition.z.toFixed(2)})`);
+    } else {
+      // Fallback: Direct position setting (reliable)
+      // IMPORTANT: Clear physics velocity when setting network position to prevent drift
+      if (this.physicsBody) {
+        this.physicsBody.velocity.set(0, 0, 0);
+        console.log(`🛑 ${this.name}: Cleared physics velocity for network position`);
+      }
+      this.setPosition(targetPosition);
+      console.log(`📍 ${this.name}: Direct position set (${targetPosition.x.toFixed(2)}, ${targetPosition.y.toFixed(2)}, ${targetPosition.z.toFixed(2)})`);
+    }
   }
   
   public setSmoothRotation(targetRotation: THREE.Euler): void {
-    // For multiplayer replication, set rotation directly
-    // Future enhancement: could add smooth interpolation here
-    this.setRotation(targetRotation);
-    console.log(`🔄 MULTIPLAYER: Set rotation for ${this.name} to Y=${targetRotation.y.toFixed(2)}`);
+    if (this.interpolationEnabled) {
+      // Set up smooth interpolation target
+      this.networkTargetRotation = targetRotation.clone();
+      console.log(`🔄 ${this.name}: Set rotation target Y=${targetRotation.y.toFixed(2)}`);
+    } else {
+      // Fallback: Direct rotation setting (reliable)
+      this.setRotation(targetRotation);
+      console.log(`🔄 ${this.name}: Direct rotation set Y=${targetRotation.y.toFixed(2)}`);
+    }
   }
+  
   
   public debugAnimationState(): void {
     console.log(`🔍 DEBUG ${this.name}: Animation State Report`);
