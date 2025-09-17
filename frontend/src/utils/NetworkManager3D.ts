@@ -47,9 +47,9 @@ export class NetworkManager3D {
   private lastBroadcastPosition: THREE.Vector3 | null = null;
   private lastBroadcastRotation: THREE.Quaternion | null = null;
   private lastBroadcastTime = 0;
-  private readonly BROADCAST_INTERVAL = 100; // ms
-  private readonly MIN_POSITION_CHANGE = 0.1; // units
-  private readonly MIN_ROTATION_CHANGE = 0.05; // radians
+  private readonly BROADCAST_INTERVAL = 50; // ms - more frequent for responsive movement
+  private readonly MIN_POSITION_CHANGE = 0.1; // units - smaller threshold for more responsive movement
+  private readonly MIN_ROTATION_CHANGE = 0.08; // radians - slightly larger threshold
   
   constructor(gameStore: GameStore) {
     this.gameStore = gameStore;
@@ -97,14 +97,19 @@ export class NetworkManager3D {
         
         // Send initial spawn message
         this.sendPlayerSpawn();
+        
+        // Debug: Log connection details
+        console.log('🔍 3D WebSocket connected successfully');
       };
       
       this.websocket.onmessage = (event) => {
+        console.log('🔍 DEBUG: Raw WebSocket message received:', event.data);
         try {
           const message: Network3DMessage = JSON.parse(event.data);
+          console.log('🔍 DEBUG: Parsed message:', message);
           this.handleMessage(message);
         } catch (error) {
-          console.error('Error parsing 3D WebSocket message:', error);
+          console.error('Error parsing 3D WebSocket message:', error, 'Raw data:', event.data);
         }
       };
       
@@ -147,25 +152,44 @@ export class NetworkManager3D {
   private sendPlayerSpawn(): void {
     const gameState = this.gameStore.store.getState();
     let characterName = gameState.currentCharacter?.name;
-    let characterClass = gameState.currentCharacter?.character_class || 'warrior';
+    let characterClass = gameState.currentCharacter?.characterClass || 'warrior';
     
     // Fallback to guest character data
-    if (!characterName) {
+    if (!characterName || characterName.trim() === '') {
       const guestCharacter = localStorage.getItem('hemoclast_guest_character');
       if (guestCharacter) {
         try {
           const guestData = JSON.parse(guestCharacter);
           characterName = guestData.name;
           characterClass = guestData.character_class || 'warrior';
+          console.log('🎭 Using guest character data for spawn:', { name: characterName, class: characterClass });
         } catch (e) {
           console.warn('Failed to parse guest character data:', e);
         }
       }
     }
     
-    // Final fallback
-    if (!characterName) {
-      characterName = 'Unknown Character';
+    // Try to get character name from localStorage as another fallback
+    if (!characterName || characterName.trim() === '') {
+      const storedCharacterData = localStorage.getItem('hemoclast_character_data');
+      if (storedCharacterData) {
+        try {
+          const characterData = JSON.parse(storedCharacterData);
+          characterName = characterData.name;
+          characterClass = characterData.character_class || 'warrior';
+          console.log('🎭 Using stored character data for spawn:', { name: characterName, class: characterClass });
+        } catch (e) {
+          console.warn('Failed to parse stored character data:', e);
+        }
+      }
+    }
+    
+    // Generate a unique name based on player/character IDs if still no name
+    if (!characterName || characterName.trim() === '' || characterName === 'Unknown Character') {
+      const playerId = localStorage.getItem('hemoclast_player_id');
+      const characterId = localStorage.getItem('hemoclast_character_id');
+      characterName = `Player_${playerId || 'X'}_${characterId || 'Y'}`;
+      console.log('🎭 Generated fallback character name:', characterName);
     }
     
     const characterId = localStorage.getItem('hemoclast_character_id');
@@ -204,8 +228,12 @@ export class NetworkManager3D {
         
       case 'player_moved':
       case 'player_moved_3d':
+      case 'player_move_3d': // Also handle the message type we're sending
+        console.log('🏃 NETWORK: Processing player movement:', message.data.character_name);
         if (this.onPlayerMoved) {
           this.onPlayerMoved(message.data);
+        } else {
+          console.warn('⚠️ NETWORK: onPlayerMoved handler not set!');
         }
         break;
         
@@ -230,6 +258,17 @@ export class NetworkManager3D {
   public broadcastPlayerUpdate(position: THREE.Vector3, rotation: THREE.Quaternion, animation: string = 'idle'): void {
     if (!this.isConnected || !this.websocket) return;
     
+    // Validate position and rotation before broadcasting
+    if (!isFinite(position.x) || !isFinite(position.y) || !isFinite(position.z)) {
+      console.warn('⚠️ Invalid position in broadcastPlayerUpdate, skipping:', position);
+      return;
+    }
+    
+    if (!isFinite(rotation.x) || !isFinite(rotation.y) || !isFinite(rotation.z) || !isFinite(rotation.w)) {
+      console.warn('⚠️ Invalid rotation in broadcastPlayerUpdate, skipping:', rotation);
+      return;
+    }
+    
     const currentTime = Date.now();
     
     // Check if enough time has passed since last broadcast
@@ -253,7 +292,38 @@ export class NetworkManager3D {
     
     if (shouldBroadcast) {
       const gameState = this.gameStore.store.getState();
-      const characterName = gameState.currentCharacter?.name || 'Unknown Character';
+      let characterName = gameState.currentCharacter?.name;
+      
+      // Use the same fallback logic as spawn for consistency
+      if (!characterName || characterName.trim() === '' || characterName === 'Unknown Character') {
+        const guestCharacter = localStorage.getItem('hemoclast_guest_character');
+        if (guestCharacter) {
+          try {
+            const guestData = JSON.parse(guestCharacter);
+            characterName = guestData.name;
+          } catch (e) {
+            // Silent fallback
+          }
+        }
+        
+        if (!characterName || characterName.trim() === '') {
+          const storedCharacterData = localStorage.getItem('hemoclast_character_data');
+          if (storedCharacterData) {
+            try {
+              const characterData = JSON.parse(storedCharacterData);
+              characterName = characterData.name;
+            } catch (e) {
+              // Silent fallback
+            }
+          }
+        }
+        
+        if (!characterName || characterName.trim() === '' || characterName === 'Unknown Character') {
+          const playerId = localStorage.getItem('hemoclast_player_id');
+          const characterId = localStorage.getItem('hemoclast_character_id');
+          characterName = `Player_${playerId || 'X'}_${characterId || 'Y'}`;
+        }
+      }
       
       const moveMessage = {
         type: 'player_move_3d',
@@ -262,7 +332,7 @@ export class NetworkManager3D {
           character_id: localStorage.getItem('hemoclast_character_id'),
           character_name: characterName,
           position: {
-            x: Math.round(position.x * 100) / 100, // Round to 2 decimal places
+            x: Math.round(position.x * 100) / 100, // Round to 2 decimal places for better precision
             y: Math.round(position.y * 100) / 100,
             z: Math.round(position.z * 100) / 100
           },
@@ -278,6 +348,12 @@ export class NetworkManager3D {
       };
       
       this.sendMessage(moveMessage);
+      
+      // Debug: Log movement amounts
+      if (this.lastBroadcastPosition) {
+        const distance = position.distanceTo(this.lastBroadcastPosition);
+        console.log(`📡 BROADCAST: Movement distance: ${distance.toFixed(3)} units, Position: (${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)})`);
+      }
       
       // Update last broadcast tracking
       this.lastBroadcastPosition = position.clone();
@@ -331,7 +407,10 @@ export class NetworkManager3D {
   
   private sendMessage(message: Network3DMessage): void {
     if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+        // Removed excessive debug logging
       this.websocket.send(JSON.stringify(message));
+    } else {
+      console.warn('⚠️ Cannot send message - WebSocket not connected. State:', this.websocket?.readyState);
     }
   }
   

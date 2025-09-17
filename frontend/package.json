@@ -16,6 +16,7 @@
     "cannon-es": "^0.20.0",
     "phaser": "^3.70.0",
     "three": "^0.160.0",
+    "three-stdlib": "^2.36.0",
     "zustand": "^4.4.7"
   },
   "devDependencies": {

@@ -8,7 +8,6 @@ import { LoginScene } from '../scenes/LoginScene';
 import { CharacterSelectionScene } from '../scenes/CharacterSelectionScene';
 import { CharacterCreationScene } from '../scenes/CharacterCreationScene';
 import { MenuScene } from '../scenes/MenuScene';
-import { GameScene } from '../scenes/GameScene';
 import { Game3DTestScene } from '../scenes/Game3DTestScene';
 import { UIScene } from '../scenes/UIScene';
 import { CityScene } from '../scenes/CityScene';
@@ -53,8 +52,7 @@ export const gameConfig: Types.Core.GameConfig = {
     CharacterSelectionScene,
     CharacterCreationScene,
     MenuScene,
-    GameScene,
-    Game3DTestScene,
+    Game3DTestScene, // Main 3D game scene
     UIScene,
     CityScene,
     SettingsScene,

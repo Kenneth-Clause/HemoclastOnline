@@ -1,6 +1,6 @@
 /**
  * Game3DScene - Three.js 3D game world with Neverwinter Nights-style gameplay
- * This scene will eventually replace GameScene.ts as we migrate to full 3D
+ * This is now the primary game scene for 3D multiplayer gameplay
  */
 
 import * as THREE from 'three';
@@ -42,8 +42,8 @@ export class Game3DScene {
   private lastBroadcastTime: number = 0;
   private isMoving3D: boolean = false; // Track movement state for broadcasting
   private readonly MOVEMENT_BROADCAST_INTERVAL = 50; // 20 FPS for smooth 3D movement
-  private readonly MIN_MOVEMENT_DISTANCE = 0.5; // Units in 3D space
-  private readonly MAX_BROADCAST_DELAY = 100; // Maximum delay between broadcasts
+  private readonly MIN_MOVEMENT_DISTANCE = 0.1; // Units in 3D space - smaller for more responsive movement
+  private readonly MAX_BROADCAST_DELAY = 200; // Maximum delay between broadcasts - less frequent for smoother movement
   
   // Input handling
   private keys: { [key: string]: boolean } = {};
@@ -219,23 +219,24 @@ export class Game3DScene {
       characterData = {
         id: 999,
         name: 'Test Character',
-        character_class: 'warrior',
+        characterClass: 'warrior',
         level: 1
       };
     }
     
-    // Create 3D character
+    // Create 3D character with enhanced procedural models
     this.character = new Character3D({
       scene: this.scene,
       physicsWorld: this.physicsWorld,
       name: characterData.name || 'Player',
-      characterClass: characterData.character_class || 'warrior',
-      position: new THREE.Vector3(0, 1, 0) // Start above ground
+      characterClass: characterData.characterClass || 'warrior',
+      position: new THREE.Vector3(0, 1, 0), // Start above ground
+      useAssets: false // Use procedural models for now (GLTF models not available)
     });
     
     console.log('✨ Created 3D character:', {
       name: characterData.name,
-      class: characterData.character_class,
+      class: characterData.characterClass,
       level: characterData.level
     });
     
@@ -299,6 +300,10 @@ export class Game3DScene {
     
     // Connect to multiplayer server
     await this.networkManager.connect();
+    
+    // Debug: Log multiplayer status
+    console.log('🔍 DEBUG: NetworkManager connected, handlers set up');
+    console.log('🔍 DEBUG: Current other players:', this.otherPlayers.size);
   }
   
   private handleMouseClick(event: MouseEvent): void {
@@ -438,6 +443,8 @@ export class Game3DScene {
       currentPlayers: this.otherPlayers.size
     });
     
+    console.log('🔍 DEBUG: handlePlayerJoined called with data:', playerData);
+    
     if (this.otherPlayers.has(playerId)) {
       console.log('⚠️ Player already exists, skipping');
       return;
@@ -447,12 +454,31 @@ export class Game3DScene {
     const spawnX = (playerData.position?.x || 0) + (Math.random() - 0.5) * 4; // Random offset ±2 units
     const spawnZ = (playerData.position?.z || 0) + (Math.random() - 0.5) * 4;
     
+    // Better character name resolution for network players
+    let characterName = playerData.character_name || playerData.name;
+    if (!characterName || characterName === 'undefined' || characterName === 'null' || characterName.trim() === '' || characterName === 'Unknown Character') {
+      // Try to extract from client_id parts
+      const parts = playerId.split('_');
+      if (parts.length >= 2) {
+        characterName = `Player_${parts[0]}_${parts[1]}`;
+      } else {
+        characterName = `Player_${playerId.substring(0, 8)}`;
+      }
+    }
+    
+    console.log(`🏷️ Resolved character name: "${characterName}" from data:`, {
+      character_name: playerData.character_name,
+      name: playerData.name,
+      client_id: playerId
+    });
+    
     const otherPlayer = new Character3D({
       scene: this.scene,
       physicsWorld: this.physicsWorld,
-      name: playerData.character_name || 'Other Player',
+      name: characterName,
       characterClass: playerData.character_class || 'warrior',
-      position: new THREE.Vector3(spawnX, 1, spawnZ)
+      position: new THREE.Vector3(spawnX, 1, spawnZ),
+      useAssets: false // Use procedural models for consistency
     });
     
     // Make other players slightly transparent and add glow effect
@@ -473,36 +499,50 @@ export class Game3DScene {
     
     console.log(`🏃 MULTIPLAYER: Player ${playerData.character_name} moved to (${playerData.position.x.toFixed(1)}, ${playerData.position.y.toFixed(1)}, ${playerData.position.z.toFixed(1)})`);
     
+    // Validate position data before applying
+    if (!playerData.position || 
+        !isFinite(playerData.position.x) || 
+        !isFinite(playerData.position.y) || 
+        !isFinite(playerData.position.z)) {
+      console.warn(`⚠️ Invalid position data for ${playerData.character_name}:`, playerData.position);
+      return;
+    }
+    
     // Update other player's position smoothly
     const targetPosition = new THREE.Vector3(
       playerData.position.x,
-      playerData.position.y,
+      Math.max(0.5, playerData.position.y), // Ensure player stays above ground
       playerData.position.z
     );
     
-    // Update rotation if provided
-    if (playerData.rotation) {
-      const targetRotation = new THREE.Euler(
-        playerData.rotation.x,
-        playerData.rotation.y,
-        playerData.rotation.z
-      );
-      otherPlayer.setRotation(targetRotation);
-    }
-    
-    // Apply animation state BEFORE moving
+    // Apply animation state FIRST (determines movement behavior)
     if (playerData.animation) {
       console.log(`🎭 Setting animation state for ${playerData.character_name}: ${playerData.animation}`);
       otherPlayer.setAnimationState(playerData.animation as 'idle' | 'walking' | 'running', true);
     }
     
-    // Move other player (NOT local player) - use network movement
-    if (playerData.animation !== 'idle') {
-      otherPlayer.moveToPosition(targetPosition, false); // false = not local player
+    // Update rotation with smooth interpolation - convert quaternion to Euler properly
+    if (playerData.rotation) {
+      const quaternion = new THREE.Quaternion(
+        playerData.rotation.x,
+        playerData.rotation.y,
+        playerData.rotation.z,
+        playerData.rotation.w
+      );
+      const targetRotation = new THREE.Euler().setFromQuaternion(quaternion);
+      otherPlayer.setSmoothRotation(targetRotation);
+      console.log(`🔄 Smooth rotation update for ${playerData.character_name}: Y=${targetRotation.y.toFixed(2)}`);
+    }
+    
+    // Only apply position update if it's not the origin (which indicates invalid data)
+    const isOriginPosition = targetPosition.x === 0 && targetPosition.y === 0 && targetPosition.z === 0;
+    
+    if (!isOriginPosition) {
+      // Always use smooth positioning for better visual consistency
+      otherPlayer.setSmoothPosition(targetPosition);
+      console.log(`🏃 Smooth position update for ${playerData.character_name} to (${targetPosition.x.toFixed(1)}, ${targetPosition.y.toFixed(1)}, ${targetPosition.z.toFixed(1)})`);
     } else {
-      // If idle, snap to position immediately (no sliding)
-      otherPlayer.setPosition(targetPosition);
-      console.log(`🛑 Player ${playerData.character_name} is idle - snapping to position`);
+      console.warn(`⚠️ Ignoring invalid origin position (0,0,0) for ${playerData.character_name}`);
     }
   }
   
@@ -521,29 +561,55 @@ export class Game3DScene {
     
     const currentTime = Date.now();
     const currentPosition = this.character.getPosition();
-    const currentRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, this.character.getRotation().y, 0));
+    const currentRotation = new THREE.Quaternion().setFromEuler(this.character.getRotation());
     const isCharacterMoving = this.character.isCurrentlyMoving();
+    
+    // Validate position before broadcasting (prevent NaN/Infinity values)
+    if (!isFinite(currentPosition.x) || !isFinite(currentPosition.y) || !isFinite(currentPosition.z)) {
+      console.warn('⚠️ Invalid position detected, skipping broadcast:', currentPosition);
+      return;
+    }
     
     // Check if we should broadcast
     let shouldBroadcast = false;
+    let broadcastReason = '';
     
     if (!this.lastBroadcastPosition || !this.lastBroadcastRotation) {
       // First broadcast
       shouldBroadcast = true;
+      broadcastReason = 'initial';
     } else {
       const positionChange = currentPosition.distanceTo(this.lastBroadcastPosition);
       const rotationChange = Math.abs(currentRotation.angleTo(this.lastBroadcastRotation));
       const timeSinceLastBroadcast = currentTime - this.lastBroadcastTime;
+      const movementStateChanged = (isCharacterMoving !== this.isMoving3D);
       
       // Broadcast if:
       // 1. Position changed significantly
-      // 2. Rotation changed significantly  
-      // 3. Maximum time delay reached
-      // 4. Movement state changed (started/stopped moving)
-      shouldBroadcast = positionChange >= this.MIN_MOVEMENT_DISTANCE ||
-                       rotationChange >= 0.1 ||
-                       timeSinceLastBroadcast >= this.MAX_BROADCAST_DELAY ||
-                       (isCharacterMoving !== this.isMoving3D);
+      if (positionChange >= this.MIN_MOVEMENT_DISTANCE) {
+        shouldBroadcast = true;
+        broadcastReason = 'position';
+      }
+      // 2. Rotation changed significantly (more sensitive for better facing direction sync)
+      else if (rotationChange >= 0.05) {
+        shouldBroadcast = true;
+        broadcastReason = 'rotation';
+      }
+      // 3. Movement state changed (started/stopped moving)
+      else if (movementStateChanged) {
+        shouldBroadcast = true;
+        broadcastReason = isCharacterMoving ? 'started_moving' : 'stopped_moving';
+      }
+      // 4. Maximum time delay reached - BUT ONLY when actively moving
+      else if (isCharacterMoving && timeSinceLastBroadcast >= this.MAX_BROADCAST_DELAY) {
+        shouldBroadcast = true;
+        broadcastReason = 'max_delay_while_moving';
+      }
+      // 5. Force periodic updates even when idle (but less frequently)
+      else if (!isCharacterMoving && timeSinceLastBroadcast >= this.MAX_BROADCAST_DELAY * 3) {
+        shouldBroadcast = true;
+        broadcastReason = 'periodic_idle';
+      }
     }
     
     if (shouldBroadcast) {
@@ -563,7 +629,10 @@ export class Game3DScene {
         animationState
       );
       
-      console.log(`📡 Broadcasting 3D position: (${currentPosition.x.toFixed(1)}, ${currentPosition.y.toFixed(1)}, ${currentPosition.z.toFixed(1)}) - ${animationState}`);
+      // Only log significant broadcasts to reduce console spam
+      if (broadcastReason === 'initial' || broadcastReason === 'started_moving' || broadcastReason === 'stopped_moving') {
+        console.log(`📡 Broadcasting 3D position: (${currentPosition.x.toFixed(1)}, ${currentPosition.y.toFixed(1)}, ${currentPosition.z.toFixed(1)}) - ${animationState} [${broadcastReason}]`);
+      }
     }
   }
 

@@ -131,9 +131,9 @@ export class Game3DTestScene extends Scene {
       height - 50,
       160,
       40,
-      '← Back to 2D',
+      '← Back to Menu',
       () => {
-        this.returnToGameScene();
+        this.returnToMenu();
       },
       {
         fontSize: 14,
@@ -215,13 +215,13 @@ export class Game3DTestScene extends Scene {
       40,
       'Return to 2D Mode',
       () => {
-        this.returnToGameScene();
+        this.returnToMenu();
       }
     );
   }
   
-  private returnToGameScene(): void {
-    console.log('🔄 Returning to 2D Game Scene');
+  private returnToMenu(): void {
+    console.log('🔄 Returning to Menu');
     
     // Clean up 3D scene
     if (this.game3D) {
@@ -241,8 +241,8 @@ export class Game3DTestScene extends Scene {
     phaserCanvas.style.zIndex = '1';
     phaserCanvas.style.pointerEvents = 'auto';
     
-    // Return to 2D game scene
-    this.scene.start('GameScene');
+    // Return to menu
+    this.scene.start('MenuScene');
   }
   
   private handleResize = (gameSize: Phaser.Structs.Size): void => {
