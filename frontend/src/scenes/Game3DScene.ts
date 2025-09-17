@@ -9,6 +9,7 @@ import { GameStore } from '../stores/gameStore';
 import { Character3D } from '../utils/Character3D';
 import { Environment3D } from '../utils/Environment3D';
 import { NetworkManager3D } from '../utils/NetworkManager3D';
+import { MovementConfig } from '../config/movementConfig';
 
 export interface Game3DConfig {
   container: HTMLElement;
@@ -41,9 +42,8 @@ export class Game3DScene {
   private movementBroadcastTimer: number | null = null;
   private lastBroadcastTime: number = 0;
   private isMoving3D: boolean = false; // Track movement state for broadcasting
-  private readonly MOVEMENT_BROADCAST_INTERVAL = 50; // 20 FPS for smooth 3D movement
-  private readonly MIN_MOVEMENT_DISTANCE = 0.1; // Units in 3D space - smaller for more responsive movement
-  private readonly MAX_BROADCAST_DELAY = 200; // Maximum delay between broadcasts - less frequent for smoother movement
+  private readonly MIN_MOVEMENT_DISTANCE = MovementConfig.MIN_MOVEMENT_THRESHOLD; // Use centralized threshold
+  private readonly MAX_BROADCAST_DELAY = MovementConfig.NETWORK_UPDATE_INTERVAL * 4; // 4x the update interval
   
   // Input handling
   private keys: { [key: string]: boolean } = {};
@@ -137,8 +137,8 @@ export class Game3DScene {
     
     this.scene.add(directionalLight);
     
-    // Atmospheric fog for depth (lighter and less dense)
-    this.scene.fog = new THREE.Fog(0x6a6a6a, 80, 300);
+    // Atmospheric fog for depth (much farther distances to not affect multiplayer)
+    this.scene.fog = new THREE.Fog(0x6a6a6a, 200, 500); // Fog starts much farther away
   }
   
   private initializePhysics(): void {
@@ -191,6 +191,9 @@ export class Game3DScene {
                 console.log('✅ Loaded character for 3D world:', characterData.name);
                 // Update game store with character data
                 gameState.setCharacter(characterData);
+                // Also store in localStorage for NetworkManager access
+                localStorage.setItem('hemoclast_character_data', JSON.stringify(characterData));
+                console.log('🎭 Stored character data in gameStore and localStorage:', characterData.name);
               }
             }
           }
@@ -207,6 +210,11 @@ export class Game3DScene {
         try {
           characterData = JSON.parse(guestCharacter);
           console.log('✅ Using guest character for 3D world:', characterData.name);
+          // Update game store with guest character data
+          gameState.setCharacter(characterData);
+          // Also store in localStorage for NetworkManager access
+          localStorage.setItem('hemoclast_character_data', JSON.stringify(characterData));
+          console.log('🎭 Stored guest character data in gameStore and localStorage:', characterData.name);
         } catch (e) {
           console.warn('Failed to parse guest character data:', e);
         }
@@ -231,7 +239,8 @@ export class Game3DScene {
       name: characterData.name || 'Player',
       characterClass: characterData.characterClass || 'warrior',
       position: new THREE.Vector3(0, 1, 0), // Start above ground
-      useAssets: false // Use procedural models for now (GLTF models not available)
+      useAssets: false, // Use procedural models for now (GLTF models not available)
+      camera: this.camera // Pass camera for nameplate facing
     });
     
     console.log('✨ Created 3D character:', {
@@ -454,16 +463,12 @@ export class Game3DScene {
     const spawnX = (playerData.position?.x || 0) + (Math.random() - 0.5) * 4; // Random offset ±2 units
     const spawnZ = (playerData.position?.z || 0) + (Math.random() - 0.5) * 4;
     
-    // Better character name resolution for network players
-    let characterName = playerData.character_name || playerData.name;
-    if (!characterName || characterName === 'undefined' || characterName === 'null' || characterName.trim() === '' || characterName === 'Unknown Character') {
-      // Try to extract from client_id parts
-      const parts = playerId.split('_');
-      if (parts.length >= 2) {
-        characterName = `Player_${parts[0]}_${parts[1]}`;
-      } else {
-        characterName = `Player_${playerId.substring(0, 8)}`;
-      }
+    // Use the character name from the network message directly
+    let characterName = playerData.character_name || playerData.name || 'Network Player';
+    
+    // Only use fallback if name is clearly invalid
+    if (characterName === 'undefined' || characterName === 'null' || characterName.trim() === '') {
+      characterName = `Player_${playerId.substring(0, 8)}`;
     }
     
     console.log(`🏷️ Resolved character name: "${characterName}" from data:`, {
@@ -478,11 +483,12 @@ export class Game3DScene {
       name: characterName,
       characterClass: playerData.character_class || 'warrior',
       position: new THREE.Vector3(spawnX, 1, spawnZ),
-      useAssets: false // Use procedural models for consistency
+      useAssets: false, // Use procedural models for consistency
+      camera: this.camera // Pass camera for nameplate facing
     });
     
-    // Make other players slightly transparent and add glow effect
-    otherPlayer.setOpacity(0.9);
+    // Keep other players fully opaque (no transparency)
+    // otherPlayer.setOpacity(0.9); // Removed - was making players transparent
     
     this.otherPlayers.set(playerId, otherPlayer);
     console.log(`✅ MULTIPLAYER: Created player ${playerData.character_name} at (${spawnX.toFixed(1)}, 1, ${spawnZ.toFixed(1)}). Total players: ${this.otherPlayers.size + 1}`);
@@ -531,16 +537,16 @@ export class Game3DScene {
       );
       const targetRotation = new THREE.Euler().setFromQuaternion(quaternion);
       otherPlayer.setSmoothRotation(targetRotation);
-      console.log(`🔄 Smooth rotation update for ${playerData.character_name}: Y=${targetRotation.y.toFixed(2)}`);
+      console.log(`🔄 DIRECT rotation update for ${playerData.character_name}: Y=${targetRotation.y.toFixed(2)}`);
     }
     
     // Only apply position update if it's not the origin (which indicates invalid data)
     const isOriginPosition = targetPosition.x === 0 && targetPosition.y === 0 && targetPosition.z === 0;
     
     if (!isOriginPosition) {
-      // Always use smooth positioning for better visual consistency
+      // Direct position update - precise and immediate
       otherPlayer.setSmoothPosition(targetPosition);
-      console.log(`🏃 Smooth position update for ${playerData.character_name} to (${targetPosition.x.toFixed(1)}, ${targetPosition.y.toFixed(1)}, ${targetPosition.z.toFixed(1)})`);
+      console.log(`📍 DIRECT position update for ${playerData.character_name} to (${targetPosition.x.toFixed(1)}, ${targetPosition.y.toFixed(1)}, ${targetPosition.z.toFixed(1)})`);
     } else {
       console.warn(`⚠️ Ignoring invalid origin position (0,0,0) for ${playerData.character_name}`);
     }

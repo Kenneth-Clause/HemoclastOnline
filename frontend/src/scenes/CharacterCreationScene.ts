@@ -903,8 +903,11 @@ export class CharacterCreationScene extends Scene {
     // Set selected character in game store
     this.gameStore.store.getState().setCharacter(character);
     
-    // Store selected character ID
+    // Store selected character ID and full data
     localStorage.setItem('hemoclast_character_id', character.id.toString());
+    localStorage.setItem('hemoclast_character_data', JSON.stringify(character));
+    
+    console.log('🎭 Created and selected character:', character.name, 'ID:', character.id);
     
     // Show success message briefly
     this.showSuccess(`${character.name} the ${character.character_class} has been created!`);

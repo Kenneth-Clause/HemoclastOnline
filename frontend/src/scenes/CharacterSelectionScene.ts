@@ -1060,8 +1060,11 @@ export class CharacterSelectionScene extends Scene {
     // Set selected character in game store
     this.gameStore.store.getState().setCharacter(character);
     
-    // Store selected character ID
+    // Store selected character ID and full data
     localStorage.setItem('hemoclast_character_id', character.id.toString());
+    localStorage.setItem('hemoclast_character_data', JSON.stringify(character));
+    
+    console.log('🎭 Selected character:', character.name, 'ID:', character.id);
     
     // Show visual feedback that character is selected
     this.showCharacterSelected(character);

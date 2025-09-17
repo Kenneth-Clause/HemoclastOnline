@@ -4,6 +4,7 @@
 
 import * as THREE from 'three';
 import { GameStore } from '../stores/gameStore';
+import { MovementConfig } from '../config/movementConfig';
 
 export interface Player3DData {
   client_id: string;
@@ -47,9 +48,9 @@ export class NetworkManager3D {
   private lastBroadcastPosition: THREE.Vector3 | null = null;
   private lastBroadcastRotation: THREE.Quaternion | null = null;
   private lastBroadcastTime = 0;
-  private readonly BROADCAST_INTERVAL = 50; // ms - more frequent for responsive movement
-  private readonly MIN_POSITION_CHANGE = 0.1; // units - smaller threshold for more responsive movement
-  private readonly MIN_ROTATION_CHANGE = 0.08; // radians - slightly larger threshold
+  private readonly BROADCAST_INTERVAL = MovementConfig.NETWORK_UPDATE_INTERVAL; // Use centralized timing
+  private readonly MIN_POSITION_CHANGE = MovementConfig.MIN_MOVEMENT_THRESHOLD; // Use centralized threshold
+  private readonly MIN_ROTATION_CHANGE = 0.05; // radians - rotation threshold
   
   constructor(gameStore: GameStore) {
     this.gameStore = gameStore;
@@ -154,29 +155,14 @@ export class NetworkManager3D {
     let characterName = gameState.currentCharacter?.name;
     let characterClass = gameState.currentCharacter?.characterClass || 'warrior';
     
-    // Fallback to guest character data
-    if (!characterName || characterName.trim() === '') {
-      const guestCharacter = localStorage.getItem('hemoclast_guest_character');
-      if (guestCharacter) {
-        try {
-          const guestData = JSON.parse(guestCharacter);
-          characterName = guestData.name;
-          characterClass = guestData.character_class || 'warrior';
-          console.log('🎭 Using guest character data for spawn:', { name: characterName, class: characterClass });
-        } catch (e) {
-          console.warn('Failed to parse guest character data:', e);
-        }
-      }
-    }
-    
-    // Try to get character name from localStorage as another fallback
+    // Get character data from localStorage if not in gameStore
     if (!characterName || characterName.trim() === '') {
       const storedCharacterData = localStorage.getItem('hemoclast_character_data');
       if (storedCharacterData) {
         try {
           const characterData = JSON.parse(storedCharacterData);
           characterName = characterData.name;
-          characterClass = characterData.character_class || 'warrior';
+          characterClass = characterData.characterClass || characterData.character_class || 'warrior';
           console.log('🎭 Using stored character data for spawn:', { name: characterName, class: characterClass });
         } catch (e) {
           console.warn('Failed to parse stored character data:', e);
@@ -184,12 +170,10 @@ export class NetworkManager3D {
       }
     }
     
-    // Generate a unique name based on player/character IDs if still no name
-    if (!characterName || characterName.trim() === '' || characterName === 'Unknown Character') {
-      const playerId = localStorage.getItem('hemoclast_player_id');
-      const characterId = localStorage.getItem('hemoclast_character_id');
-      characterName = `Player_${playerId || 'X'}_${characterId || 'Y'}`;
-      console.log('🎭 Generated fallback character name:', characterName);
+    // Final validation - if still no name, something is wrong
+    if (!characterName || characterName.trim() === '') {
+      console.error('❌ No character name found! This should not happen.');
+      characterName = 'Unknown Player';
     }
     
     const characterId = localStorage.getItem('hemoclast_character_id');
@@ -294,35 +278,22 @@ export class NetworkManager3D {
       const gameState = this.gameStore.store.getState();
       let characterName = gameState.currentCharacter?.name;
       
-      // Use the same fallback logic as spawn for consistency
-      if (!characterName || characterName.trim() === '' || characterName === 'Unknown Character') {
-        const guestCharacter = localStorage.getItem('hemoclast_guest_character');
-        if (guestCharacter) {
+      // Get character name from localStorage if not in gameStore
+      if (!characterName || characterName.trim() === '') {
+        const storedCharacterData = localStorage.getItem('hemoclast_character_data');
+        if (storedCharacterData) {
           try {
-            const guestData = JSON.parse(guestCharacter);
-            characterName = guestData.name;
+            const characterData = JSON.parse(storedCharacterData);
+            characterName = characterData.name;
           } catch (e) {
-            // Silent fallback
+            console.warn('Failed to parse character data for movement broadcast:', e);
           }
         }
-        
-        if (!characterName || characterName.trim() === '') {
-          const storedCharacterData = localStorage.getItem('hemoclast_character_data');
-          if (storedCharacterData) {
-            try {
-              const characterData = JSON.parse(storedCharacterData);
-              characterName = characterData.name;
-            } catch (e) {
-              // Silent fallback
-            }
-          }
-        }
-        
-        if (!characterName || characterName.trim() === '' || characterName === 'Unknown Character') {
-          const playerId = localStorage.getItem('hemoclast_player_id');
-          const characterId = localStorage.getItem('hemoclast_character_id');
-          characterName = `Player_${playerId || 'X'}_${characterId || 'Y'}`;
-        }
+      }
+      
+      // Final fallback
+      if (!characterName || characterName.trim() === '') {
+        characterName = 'Unknown Player';
       }
       
       const moveMessage = {
@@ -332,9 +303,9 @@ export class NetworkManager3D {
           character_id: localStorage.getItem('hemoclast_character_id'),
           character_name: characterName,
           position: {
-            x: Math.round(position.x * 100) / 100, // Round to 2 decimal places for better precision
-            y: Math.round(position.y * 100) / 100,
-            z: Math.round(position.z * 100) / 100
+            x: MovementConfig.roundPosition(position.x), // Use centralized precision
+            y: MovementConfig.roundPosition(position.y),
+            z: MovementConfig.roundPosition(position.z)
           },
           rotation: {
             x: Math.round(rotation.x * 1000) / 1000, // Round to 3 decimal places
@@ -348,12 +319,6 @@ export class NetworkManager3D {
       };
       
       this.sendMessage(moveMessage);
-      
-      // Debug: Log movement amounts
-      if (this.lastBroadcastPosition) {
-        const distance = position.distanceTo(this.lastBroadcastPosition);
-        console.log(`📡 BROADCAST: Movement distance: ${distance.toFixed(3)} units, Position: (${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)})`);
-      }
       
       // Update last broadcast tracking
       this.lastBroadcastPosition = position.clone();

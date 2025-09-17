@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { AssetLoader, CharacterAsset } from './AssetLoader';
 import { TestModelGenerator } from './TestModelGenerator';
+import { MovementConfig } from '../config/movementConfig';
 
 export interface Character3DConfig {
   scene: THREE.Scene;
@@ -15,6 +16,7 @@ export interface Character3DConfig {
   position: THREE.Vector3;
   useAssets?: boolean; // Whether to try loading GLTF models
   modelPath?: string; // Custom model path
+  camera?: THREE.Camera; // Optional camera reference for nameplate facing
 }
 
 export class Character3D {
@@ -29,16 +31,14 @@ export class Character3D {
   // Animation and movement
   private mixer: THREE.AnimationMixer | null = null;
   private currentAnimation: THREE.AnimationAction | null = null;
-  private moveSpeed = 25; // Units per second - increased for more visible movement
+  private moveSpeed = MovementConfig.BASE_MOVE_SPEED; // Use centralized movement speed
   private isMoving = false;
   private movementDirection = new THREE.Vector3();
   private targetPosition: THREE.Vector3 | null = null;
   
-  // Enhanced movement smoothing
+  // Network player smoothing (simplified)
   private lastPosition = new THREE.Vector3();
   private targetPosition3D: THREE.Vector3 | null = null; // For network players
-  private positionLerpFactor = 0.15; // More responsive interpolation for better visibility
-  private rotationLerpFactor = 0.12; // Smoother rotation
   private lastRotation = new THREE.Euler();
   private targetRotation: THREE.Euler | null = null;
   
@@ -75,6 +75,7 @@ export class Character3D {
   // References
   private scene: THREE.Scene;
   private physicsWorld: CANNON.World;
+  private camera: THREE.Camera | null = null;
   
   // Asset system
   private characterAsset: CharacterAsset | null = null;
@@ -86,6 +87,7 @@ export class Character3D {
     this.physicsWorld = config.physicsWorld;
     this.name = config.name;
     this.characterClass = config.characterClass;
+    this.camera = config.camera || null;
     // Disable asset loading by default until GLTF models are available
     this.useAssets = config.useAssets || false;
     
@@ -338,37 +340,11 @@ export class Character3D {
     context.clearRect(0, 0, canvas.width, canvas.height);
     
     // Set up text styling
-    context.font = '20px Arial, sans-serif'; // Use a more reliable font
+    context.font = '24px Arial, sans-serif'; // Slightly larger font for readability
     context.textAlign = 'center';
     context.textBaseline = 'middle';
     
-    // Measure text to create proper background
-    const textMetrics = context.measureText(cleanName);
-    const textWidth = textMetrics.width;
-    const padding = 8;
-    const bgWidth = textWidth + (padding * 2);
-    const bgHeight = 28;
-    const bgX = (canvas.width - bgWidth) / 2;
-    const bgY = (canvas.height - bgHeight) / 2;
-    
-    // Draw background (rounded rectangle with fallback)
-    context.fillStyle = 'rgba(0, 0, 0, 0.6)';
-    context.beginPath();
-    
-    // Check if roundRect is supported, otherwise use regular rect
-    if (typeof context.roundRect === 'function') {
-      context.roundRect(bgX, bgY, bgWidth, bgHeight, 4);
-    } else {
-      // Fallback to regular rectangle
-      context.rect(bgX, bgY, bgWidth, bgHeight);
-    }
-    context.fill();
-    
-    // Draw text with outline
-    context.strokeStyle = '#000000';
-    context.lineWidth = 2;
-    context.strokeText(cleanName, canvas.width / 2, canvas.height / 2);
-    
+    // Just draw clean white text - no background, no outline
     context.fillStyle = '#FFFFFF';
     context.fillText(cleanName, canvas.width / 2, canvas.height / 2);
     
@@ -378,11 +354,12 @@ export class Character3D {
     const material = new THREE.SpriteMaterial({ 
       map: texture,
       transparent: true,
-      alphaTest: 0.01
+      alphaTest: 0.01,
+      sizeAttenuation: false // Prevent size scaling with distance
     });
     this.nameplate = new THREE.Sprite(material);
     this.nameplate.position.y = 2.5; // Above character head
-    this.nameplate.scale.set(1.5, 0.4, 1); // Smaller scale for cleaner look
+    this.nameplate.scale.set(0.1, 0.05, 1); // Very small nameplates
     
     this.group.add(this.nameplate);
     
@@ -518,10 +495,10 @@ export class Character3D {
     // Sync physics body position with visual representation
     this.syncPhysicsToVisual();
     
-    // Update nameplate to always face camera
-    if (this.nameplate) {
-      // This would need camera reference in a real implementation
-      // For now, keep it simple
+    // Update nameplate to always face camera (if camera is available)
+    if (this.nameplate && this.camera) {
+      // Make nameplate always face the camera
+      this.nameplate.lookAt(this.camera.position);
     }
   }
   
@@ -664,95 +641,25 @@ export class Character3D {
       return;
     }
     
-    // For network players - set target for smooth interpolation with prediction
-    this.targetPosition3D = targetPosition.clone();
-    this.isLocalPlayer = false;
-    
-    // Calculate velocity for prediction
-    const currentTime = Date.now();
-    const deltaTime = (currentTime - this.lastUpdateTime) / 1000;
-    
-    if (deltaTime > 0 && deltaTime < 5 && this.lastPosition) { // Prevent huge deltaTime values
-      this.velocity.subVectors(targetPosition, this.lastPosition).divideScalar(deltaTime);
-      // Limit velocity for reasonable prediction
-      const maxVelocity = 20; // units per second
-      if (this.velocity.length() > maxVelocity) {
-        this.velocity.normalize().multiplyScalar(maxVelocity);
-      }
+    // DIRECT POSITION UPDATE - No interpolation, no smoothing
+    this.group.position.copy(targetPosition);
+    if (this.physicsBody) {
+      this.physicsBody.position.copy(targetPosition as any);
     }
     
-    this.lastPosition.copy(targetPosition);
-    this.lastUpdateTime = currentTime;
+    this.isLocalPlayer = false;
+    console.log(`📍 DIRECT: ${this.name} moved to (${targetPosition.x.toFixed(2)}, ${targetPosition.y.toFixed(2)}, ${targetPosition.z.toFixed(2)})`);
   }
   
   public setSmoothRotation(targetRotation: THREE.Euler): void {
-    // For network players - set target rotation for smooth interpolation
-    this.targetRotation = targetRotation.clone();
+    // DIRECT ROTATION UPDATE - No interpolation, no smoothing
+    this.group.rotation.copy(targetRotation);
+    console.log(`🔄 DIRECT: ${this.name} rotation set to Y=${targetRotation.y.toFixed(2)}`);
   }
   
   private updateNetworkSmoothing(deltaTime: number): void {
-    // Skip for local player
-    if (this.isLocalPlayer) return;
-    
-    // Update predicted position based on velocity
-    if (this.velocity.length() > 0.1) {
-      this.predictedPosition.add(this.velocity.clone().multiplyScalar(deltaTime));
-    }
-    
-    // Smooth position interpolation for network players
-    if (this.targetPosition3D) {
-      const distance = this.group.position.distanceTo(this.targetPosition3D);
-      
-      if (distance > 0.02) { // Smaller threshold for more precise movement
-        // Use predicted position for smoother movement
-        const targetPos = this.targetPosition3D.clone();
-        
-        // Blend between current position and predicted position
-        const predictionWeight = Math.min(distance / 3.0, 0.2); // Less aggressive prediction
-        targetPos.lerp(this.predictedPosition, predictionWeight);
-        
-        // Use frame-rate independent interpolation with smoother curve
-        const lerpFactor = 1 - Math.exp(-this.positionLerpFactor * deltaTime * 60);
-        this.group.position.lerp(targetPos, lerpFactor);
-        
-        if (this.physicsBody) {
-          this.physicsBody.position.copy(this.group.position as any);
-        }
-      } else {
-        // Close enough - snap to target and sync prediction
-        this.group.position.copy(this.targetPosition3D);
-        if (this.physicsBody) {
-          this.physicsBody.position.copy(this.group.position as any);
-        }
-        this.predictedPosition.copy(this.targetPosition3D);
-        this.targetPosition3D = null;
-      }
-    }
-    
-    // Smooth rotation interpolation for network players
-    if (this.targetRotation) {
-      const rotationDiff = Math.abs(this.group.rotation.y - this.targetRotation.y);
-      
-      if (rotationDiff > 0.005) { // Smaller threshold for smoother rotation
-        // Use frame-rate independent interpolation for rotation
-        const lerpFactor = 1 - Math.exp(-this.rotationLerpFactor * deltaTime * 60);
-        
-        // Handle rotation wrapping (shortest path)
-        const currentY = this.group.rotation.y;
-        const targetY = this.targetRotation.y;
-        let diff = targetY - currentY;
-        
-        // Wrap to shortest path
-        if (diff > Math.PI) diff -= 2 * Math.PI;
-        if (diff < -Math.PI) diff += 2 * Math.PI;
-        
-        this.group.rotation.y = currentY + diff * lerpFactor;
-      } else {
-        // Close enough - snap to target
-        this.group.rotation.copy(this.targetRotation);
-        this.targetRotation = null;
-      }
-    }
+    // NO NETWORK SMOOTHING - All updates are now direct and immediate
+    // This method is kept for compatibility but does nothing
   }
   
   public getRotation(): THREE.Euler {
