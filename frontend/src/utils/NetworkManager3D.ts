@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { GameStore } from '../stores/gameStore';
 import { MovementConfig } from '../config/movementConfig';
+import { DebugConsole } from './DebugConsole';
 
 export interface Player3DData {
   client_id: string;
@@ -84,12 +85,12 @@ export class NetworkManager3D {
       
       const wsUrl = `${protocol}//${host}/ws/${clientId}?token=${encodeURIComponent(token)}`;
       
-      console.log('🌐 Connecting to 3D multiplayer server:', wsUrl);
+      DebugConsole.info('NETWORK', `🌐 Connecting to 3D multiplayer server: ${wsUrl}`);
       
       this.websocket = new WebSocket(wsUrl);
       
       this.websocket.onopen = () => {
-        console.log('✅ Connected to 3D multiplayer server');
+        DebugConsole.info('NETWORK', '✅ Connected to 3D multiplayer server');
         this.isConnected = true;
         this.reconnectAttempts = 0;
         
@@ -100,29 +101,32 @@ export class NetworkManager3D {
         // Send initial spawn message
         this.sendPlayerSpawn();
         
-        // Debug: Log connection details
-        console.log('🔍 3D WebSocket connected successfully');
+        DebugConsole.info('NETWORK', '🔍 3D WebSocket connected successfully');
       };
       
       this.websocket.onmessage = (event) => {
-        console.log('🔍 DEBUG: Raw WebSocket message received:', event.data);
+        // Only log raw messages in verbose mode
+        DebugConsole.verbose('NETWORK', `Raw WebSocket message: ${event.data}`, 5000);
         try {
           const message: Network3DMessage = JSON.parse(event.data);
-          console.log('🔍 DEBUG: Parsed message:', message);
+          // Throttle parsed message logging to reduce spam
+          DebugConsole.debug('NETWORK', `Parsed message: ${message.type}`, 1000);
           this.handleMessage(message);
         } catch (error) {
+          DebugConsole.error('NETWORK', `Error parsing WebSocket message: ${error}`);
           console.error('Error parsing 3D WebSocket message:', error, 'Raw data:', event.data);
         }
       };
       
       this.websocket.onerror = (error) => {
+        DebugConsole.error('NETWORK', `3D WebSocket error: ${error}`);
         console.error('3D WebSocket error:', error);
         this.isConnected = false;
         this.gameStore.store.getState().setConnected(false);
       };
       
       this.websocket.onclose = () => {
-        console.log('Disconnected from 3D multiplayer server');
+        DebugConsole.warn('NETWORK', 'Disconnected from 3D multiplayer server');
         this.isConnected = false;
         this.gameStore.store.getState().setWebSocket(null);
         this.gameStore.store.getState().setConnected(false);
@@ -132,6 +136,7 @@ export class NetworkManager3D {
       };
       
     } catch (error) {
+      DebugConsole.error('NETWORK', `Failed to connect to 3D multiplayer server: ${error}`);
       console.error('Failed to connect to 3D multiplayer server:', error);
     }
   }
@@ -141,7 +146,7 @@ export class NetworkManager3D {
       this.reconnectAttempts++;
       const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts - 1), 10000);
       
-      console.log(`🔄 Attempting 3D reconnection in ${delay/1000} seconds... (${this.reconnectAttempts}/${this.MAX_RECONNECT_ATTEMPTS})`);
+      DebugConsole.info('NETWORK', `🔄 Attempting 3D reconnection in ${delay/1000} seconds... (${this.reconnectAttempts}/${this.MAX_RECONNECT_ATTEMPTS})`);
       
       setTimeout(() => {
         this.connect();
@@ -164,7 +169,7 @@ export class NetworkManager3D {
           const characterData = JSON.parse(storedCharacterData);
           characterName = characterData.name;
           characterClass = characterData.characterClass || characterData.character_class || 'warrior';
-          console.log('🎭 Using stored character data for spawn:', { name: characterName, class: characterClass });
+          DebugConsole.debug('NETWORK', `🎭 Using stored character data for spawn: ${characterName} (${characterClass})`);
         } catch (e) {
           console.warn('Failed to parse stored character data:', e);
         }
@@ -196,16 +201,17 @@ export class NetworkManager3D {
     };
     
     this.sendMessage(spawnMessage);
-    console.log('📡 Sent 3D player spawn message:', spawnMessage);
+    DebugConsole.debug('NETWORK', `📡 Sent 3D player spawn message: ${spawnMessage.type}`);
   }
   
   private handleMessage(message: Network3DMessage): void {
-    console.log('📡 NETWORK: Received 3D message:', message.type, message.data);
+    // Only log message types, not full data to reduce spam
+    DebugConsole.debug('NETWORK', `📡 Received 3D message: ${message.type}`, 2000);
     
     switch (message.type) {
       case 'player_joined':
       case 'player_joined_3d':
-        console.log('🎭 NETWORK: Processing player joined');
+        DebugConsole.info('NETWORK', '🎭 Processing player joined');
         if (this.onPlayerJoined) {
           this.onPlayerJoined(message.data);
         }
@@ -214,7 +220,8 @@ export class NetworkManager3D {
       case 'player_moved':
       case 'player_moved_3d':
       case 'player_move_3d': // Also handle the message type we're sending
-        console.log('🏃 NETWORK: Processing player movement:', message.data.character_name);
+        // Throttle movement logging heavily to reduce spam
+        DebugConsole.verbose('NETWORK', `🏃 Processing player movement: ${message.data.character_name}`, 5000);
         if (this.onPlayerMoved) {
           this.onPlayerMoved(message.data);
         } else {
@@ -281,7 +288,7 @@ export class NetworkManager3D {
     if (shouldBroadcast) {
       // Only log animation state changes, not regular position updates
       if (animationChanged) {
-        console.log(`🎭 NETWORK: Broadcasting animation change: ${this.lastBroadcastAnimation} → ${animation}`);
+        DebugConsole.debug('NETWORK', `🎭 Broadcasting animation change: ${this.lastBroadcastAnimation} → ${animation}`);
       }
       const gameState = this.gameStore.store.getState();
       let characterName = gameState.currentCharacter?.name;

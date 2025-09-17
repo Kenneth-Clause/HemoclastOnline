@@ -4,6 +4,7 @@
 
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
+import { DebugConsole } from './DebugConsole';
 
 export class Environment3D {
   private scene: THREE.Scene;
@@ -32,11 +33,11 @@ export class Environment3D {
     this.ambientLight = scene.children.find(child => child instanceof THREE.AmbientLight) as THREE.AmbientLight;
     this.directionalLight = scene.children.find(child => child instanceof THREE.DirectionalLight) as THREE.DirectionalLight;
     
-    console.log('🌍 Environment3D initialized');
+    DebugConsole.info('SCENE', '🌍 Environment3D initialized');
   }
   
   public async loadBasicEnvironment(): Promise<void> {
-    console.log('🏗️ Loading basic 3D environment...');
+    DebugConsole.info('SCENE', '🏗️ Loading basic 3D environment...');
     
     // Create terrain
     await this.createTerrain();
@@ -53,7 +54,7 @@ export class Environment3D {
     // Set up weather
     this.initializeWeather();
     
-    console.log('✅ Basic environment loaded');
+    DebugConsole.info('SCENE', '✅ Basic environment loaded');
   }
   
   private async createTerrain(): Promise<void> {
@@ -511,6 +512,6 @@ export class Environment3D {
       (this.weatherSystem.material as THREE.Material).dispose();
     }
     
-    console.log('🧹 Environment3D cleaned up');
+    DebugConsole.info('SCENE', '🧹 Environment3D cleaned up');
   }
 }

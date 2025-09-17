@@ -4,6 +4,7 @@
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DebugConsole } from './DebugConsole';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 
 export interface CharacterAsset {
@@ -26,6 +27,14 @@ export class AssetLoader {
   private dracoLoader: DRACOLoader;
   private assetCache: Map<string, CharacterAsset> = new Map();
   private loadingPromises: Map<string, Promise<CharacterAsset>> = new Map();
+  
+  // Asset tracking for performance monitoring
+  private loadingAssets: Set<string> = new Set();
+  private assetSizes: Map<string, number> = new Map();
+  private loadTimes: Map<string, number> = new Map();
+  private cacheHits = 0;
+  private cacheMisses = 0;
+  private totalMemoryUsage = 0;
 
   private constructor() {
     // Initialize GLTF loader
@@ -36,7 +45,7 @@ export class AssetLoader {
     this.dracoLoader.setDecoderPath('/draco/'); // Path to DRACO decoder
     this.gltfLoader.setDRACOLoader(this.dracoLoader);
     
-    console.log('🎯 AssetLoader initialized with GLTF and DRACO support');
+    DebugConsole.info('ASSETS', '🎯 AssetLoader initialized with GLTF and DRACO support');
   }
 
   public static getInstance(): AssetLoader {
@@ -52,33 +61,53 @@ export class AssetLoader {
   public async loadCharacterAsset(assetPath: string, config?: AssetConfig): Promise<CharacterAsset> {
     // Check cache first
     if (this.assetCache.has(assetPath)) {
-      console.log(`📦 Using cached asset: ${assetPath}`);
+      this.cacheHits++;
+      DebugConsole.debug('ASSETS', `💾 Cache hit: ${assetPath} (${this.cacheHits} hits, ${this.cacheMisses} misses)`);
+      this.logCacheStats();
       return this.cloneCharacterAsset(this.assetCache.get(assetPath)!);
     }
 
     // Check if already loading
     if (this.loadingPromises.has(assetPath)) {
-      console.log(`⏳ Asset already loading: ${assetPath}`);
+      DebugConsole.debug('ASSETS', `⏳ Asset already loading: ${assetPath}`);
       return this.loadingPromises.get(assetPath)!;
     }
 
     // Start loading
+    this.cacheMisses++;
+    this.loadingAssets.add(assetPath);
+    const startTime = performance.now();
+    DebugConsole.info('ASSETS', `🔄 Loading asset: ${assetPath}`);
+    
     const loadingPromise = this.loadGLTFAsset(assetPath, config);
     this.loadingPromises.set(assetPath, loadingPromise);
 
     try {
       const asset = await loadingPromise;
+      const loadTime = performance.now() - startTime;
+      
+      // Track asset metrics
+      this.loadTimes.set(assetPath, loadTime);
+      this.loadingAssets.delete(assetPath);
       
       // Cache the original asset
       this.assetCache.set(assetPath, asset);
       this.loadingPromises.delete(assetPath);
       
-      console.log(`✅ Loaded and cached asset: ${assetPath}`);
+      // Estimate memory usage
+      const estimatedSize = this.estimateAssetSize(asset);
+      this.assetSizes.set(assetPath, estimatedSize);
+      this.totalMemoryUsage += estimatedSize;
+      
+      DebugConsole.info('ASSETS', `✅ Asset loaded: ${assetPath} (${loadTime.toFixed(0)}ms, ~${(estimatedSize/1024).toFixed(1)}KB)`);
+      this.logMemoryUsage();
       
       // Return a clone for use
       return this.cloneCharacterAsset(asset);
     } catch (error) {
+      this.loadingAssets.delete(assetPath);
       this.loadingPromises.delete(assetPath);
+      DebugConsole.error('ASSETS', `❌ Failed to load asset: ${assetPath} - ${error}`);
       throw error;
     }
   }
@@ -332,6 +361,88 @@ export class AssetLoader {
     // Dispose loaders
     this.dracoLoader.dispose();
     
-    console.log('🧹 AssetLoader disposed');
+    DebugConsole.info('ASSETS', '🧹 AssetLoader disposed');
+  }
+
+  // Asset tracking and performance methods
+  private estimateAssetSize(asset: CharacterAsset): number {
+    let size = 0;
+    
+    // Estimate geometry size
+    asset.scene.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.geometry) {
+        const geometry = child.geometry;
+        const attributes = geometry.attributes;
+        
+        for (const name in attributes) {
+          const attribute = attributes[name];
+          size += attribute.array.byteLength;
+        }
+        
+        if (geometry.index) {
+          size += geometry.index.array.byteLength;
+        }
+      }
+    });
+    
+    // Estimate animation size
+    asset.animations.forEach(clip => {
+      clip.tracks.forEach(track => {
+        size += track.values.byteLength + track.times.byteLength;
+      });
+    });
+    
+    return size;
+  }
+  
+  private logCacheStats(): void {
+    const totalRequests = this.cacheHits + this.cacheMisses;
+    const hitRate = totalRequests > 0 ? ((this.cacheHits / totalRequests) * 100).toFixed(1) : '0';
+    
+    DebugConsole.debug('ASSETS', `Cache stats: ${hitRate}% hit rate (${this.cacheHits}/${totalRequests})`, 10000);
+  }
+  
+  private logMemoryUsage(): void {
+    const totalMB = (this.totalMemoryUsage / 1024 / 1024).toFixed(1);
+    const assetCount = this.assetCache.size;
+    const loadingCount = this.loadingAssets.size;
+    
+    DebugConsole.debug('ASSETS', `Memory: ${totalMB}MB across ${assetCount} assets (${loadingCount} loading)`, 5000);
+  }
+  
+  public getAssetStats(): {
+    cacheHits: number;
+    cacheMisses: number;
+    totalMemoryMB: number;
+    assetCount: number;
+    loadingCount: number;
+    averageLoadTime: number;
+  } {
+    const loadTimes = Array.from(this.loadTimes.values());
+    const averageLoadTime = loadTimes.length > 0 
+      ? loadTimes.reduce((sum, time) => sum + time, 0) / loadTimes.length 
+      : 0;
+      
+    return {
+      cacheHits: this.cacheHits,
+      cacheMisses: this.cacheMisses,
+      totalMemoryMB: this.totalMemoryUsage / 1024 / 1024,
+      assetCount: this.assetCache.size,
+      loadingCount: this.loadingAssets.size,
+      averageLoadTime
+    };
+  }
+  
+  public clearCache(): void {
+    const clearedCount = this.assetCache.size;
+    const clearedMemory = (this.totalMemoryUsage / 1024 / 1024).toFixed(1);
+    
+    this.assetCache.clear();
+    this.loadingPromises.clear();
+    this.assetSizes.clear();
+    this.loadTimes.clear();
+    this.totalMemoryUsage = 0;
+    
+    DebugConsole.info('ASSETS', `🧹 Cleared ${clearedCount} assets, freed ${clearedMemory}MB`);
   }
 }

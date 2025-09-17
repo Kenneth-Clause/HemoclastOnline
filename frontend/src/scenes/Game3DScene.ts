@@ -8,10 +8,12 @@ import * as CANNON from 'cannon-es';
 import { GameStore } from '../stores/gameStore';
 import { Character3D } from '../utils/Character3D';
 import { DebugConsole } from '../utils/DebugConsole';
+import { PerformanceMonitor } from '../utils/PerformanceMonitor';
 
-// Debug: Immediate import test
-console.log('🔍 IMPORT: Character3D imported:', Character3D);
-console.log('🔍 IMPORT: typeof Character3D:', typeof Character3D);
+// Debug: Immediate import test - only log if there's an issue
+if (!Character3D) {
+  DebugConsole.error('SCENE', 'Character3D import failed!');
+}
 import { Environment3D } from '../utils/Environment3D';
 import { NetworkManager3D } from '../utils/NetworkManager3D';
 import { MovementConfig } from '../config/movementConfig';
@@ -37,6 +39,7 @@ export class Game3DScene {
   private character: Character3D | null = null;
   private environment: Environment3D | null = null;
   private networkManager: NetworkManager3D | null = null;
+  private performanceMonitor: PerformanceMonitor;
   
   // Multiplayer
   private otherPlayers: Map<string, Character3D> = new Map();
@@ -74,10 +77,11 @@ export class Game3DScene {
   
   constructor(config: Game3DConfig) {
     this.gameStore = GameStore.getInstance();
+    this.performanceMonitor = PerformanceMonitor.getInstance();
     
     // Initialize debug console
     const debugConsole = DebugConsole.getInstance();
-    debugConsole.addLog('LOG', ['🎮 Initializing 3D Game Scene...']);
+    debugConsole.addLogLegacy('LOG', ['🎮 Initializing 3D Game Scene...']);
     
     this.initializeThreeJS(config);
     this.initializePhysics();
@@ -88,9 +92,9 @@ export class Game3DScene {
     // Start the render loop
     this.animate();
     
-    console.log('🎮 3D Game Scene initialized - Welcome to 3D HemoclastOnline!');
-    debugConsole.addLog('LOG', ['🎮 3D Game Scene initialized - Welcome to 3D HemoclastOnline!']);
-    debugConsole.addLog('LOG', ['💡 Press ~ (tilde) to toggle this debug console']);
+    DebugConsole.info('SCENE', '🎮 3D Game Scene initialized - Welcome to 3D HemoclastOnline!');
+    debugConsole.addLogLegacy('LOG', ['🎮 3D Game Scene initialized - Welcome to 3D HemoclastOnline!']);
+    debugConsole.addLogLegacy('LOG', ['💡 Press ~ (tilde) to toggle this debug console']);
   }
   
   private initializeThreeJS(config: Game3DConfig): void {
@@ -188,7 +192,7 @@ export class Game3DScene {
     if (!characterData) {
       const characterId = localStorage.getItem('hemoclast_character_id');
       if (characterId) {
-        console.log('Loading character data from localStorage for 3D scene');
+        DebugConsole.debug('GAMESTATE', 'Loading character data from localStorage for 3D scene');
         try {
           const token = localStorage.getItem('hemoclast_token');
           if (token) {
@@ -204,12 +208,12 @@ export class Game3DScene {
               characterData = characters.find((char: any) => char.id.toString() === characterId);
               
               if (characterData) {
-                console.log('✅ Loaded character for 3D world:', characterData.name);
+                DebugConsole.info('GAMESTATE', `✅ Loaded character for 3D world: ${characterData.name}`);
                 // Update game store with character data
                 gameState.setCharacter(characterData);
                 // Also store in localStorage for NetworkManager access
                 localStorage.setItem('hemoclast_character_data', JSON.stringify(characterData));
-                console.log('🎭 Stored character data in gameStore and localStorage:', characterData.name);
+                DebugConsole.debug('GAMESTATE', `🎭 Stored character data in gameStore and localStorage: ${characterData.name}`);
               }
             }
           }
@@ -225,13 +229,13 @@ export class Game3DScene {
       if (guestCharacter) {
         try {
           characterData = JSON.parse(guestCharacter);
-          console.log('✅ Using guest character for 3D world:', characterData?.name);
+          DebugConsole.info('GAMESTATE', `✅ Using guest character for 3D world: ${characterData?.name}`);
           // Update game store with guest character data
           if (characterData) {
             gameState.setCharacter(characterData);
             // Also store in localStorage for NetworkManager access
             localStorage.setItem('hemoclast_character_data', JSON.stringify(characterData));
-            console.log('🎭 Stored guest character data in gameStore and localStorage:', characterData.name);
+            DebugConsole.debug('GAMESTATE', `🎭 Stored guest character data in gameStore and localStorage: ${characterData.name}`);
           }
         } catch (e) {
           console.warn('Failed to parse guest character data:', e);
@@ -241,7 +245,7 @@ export class Game3DScene {
     
     // Final fallback to test character
     if (!characterData) {
-      console.log('Creating default test character for 3D scene');
+      DebugConsole.debug('GAMESTATE', 'Creating default test character for 3D scene');
       characterData = {
         id: 999,
         name: 'Test Character',
@@ -253,32 +257,26 @@ export class Game3DScene {
     }
     
     // Test Character3D class loading
-    console.log('🧪 SCENE: Testing Character3D class...');
-    console.log('🧪 SCENE: Character3D type:', typeof Character3D);
-    console.log('🧪 SCENE: Character3D:', Character3D);
+    DebugConsole.debug('SCENE', '🧪 Testing Character3D class...');
+    DebugConsole.verbose('SCENE', `Character3D type: ${typeof Character3D}`, 10000);
     
     try {
       Character3D.test();
-      console.log('🧪 SCENE: Character3D.test() completed successfully');
+      DebugConsole.debug('SCENE', '🧪 Character3D.test() completed successfully');
     } catch (error) {
       console.error('❌ SCENE: Character3D.test() failed:', error);
     }
     
     // Create 3D character with enhanced procedural models
-    console.log('🎬 SCENE: About to create Character3D with data:', {
-      name: characterData.name || 'Player',
-      characterClass: characterData.characterClass || 'warrior',
-      useAssets: true,
-      position: { x: 0, y: 1, z: 0 }
-    });
+    DebugConsole.debug('SCENE', `🎬 Creating Character3D: ${characterData.name || 'Player'} (${characterData.characterClass || 'warrior'})`);
     
     try {
       const debugConsole = DebugConsole.getInstance();
       
-      console.log('🎬 SCENE: Attempting Character3D instantiation...');
-      console.log('🎬 SCENE: About to call new Character3D() constructor');
-      debugConsole.addLog('LOG', ['🎬 SCENE: Attempting Character3D instantiation...']);
-      debugConsole.addLog('LOG', ['🎬 SCENE: About to call new Character3D() constructor']);
+      DebugConsole.debug('SCENE', '🎬 Attempting Character3D instantiation...');
+      DebugConsole.debug('SCENE', '🎬 About to call new Character3D() constructor');
+      debugConsole.addLogLegacy('LOG', ['🎬 SCENE: Attempting Character3D instantiation...']);
+      debugConsole.addLogLegacy('LOG', ['🎬 SCENE: About to call new Character3D() constructor']);
       
       // Expose debug references
       (window as any).debugScene = this.scene;
@@ -302,6 +300,10 @@ export class Game3DScene {
       // Mark as main player (controls own movement)
       this.character.setAsMainPlayer(true);
       
+      // Disable interpolation for main player (they control their own movement directly)
+      this.character.setInterpolationEnabled(false);
+      DebugConsole.info('SCENE', `🎮 Disabled interpolation for main player: ${characterData.name || 'Player'}`);
+      
       // Expose character for debugging
       (window as any).debugCharacter = this.character;
       (window as any).debugAnimationState = () => this.character?.debugAnimationState();
@@ -321,7 +323,7 @@ export class Game3DScene {
           console.log(`🔧 DEBUG: Disabling interpolation for player ${playerId}`);
           player.setInterpolationEnabled(false);
         });
-        console.log('📍 Interpolation DISABLED for all players (direct positioning)');
+        DebugConsole.info('SCENE', '📍 Interpolation DISABLED for all players (direct positioning)');
       };
       
       // Add a function to check current state
@@ -332,16 +334,16 @@ export class Game3DScene {
         });
       };
       
-      console.log('🎬 SCENE: Character3D instantiation successful');
-      debugConsole.addLog('LOG', ['🎬 SCENE: Character3D instantiation successful']);
+      DebugConsole.debug('SCENE', '🎬 Character3D instantiation successful');
+      debugConsole.addLogLegacy('LOG', ['🎬 SCENE: Character3D instantiation successful']);
       
       // Check if constructor was actually called
       if ((window as any).CHARACTER3D_CONSTRUCTOR_CALLED) {
-        console.log('✅ SCENE: Constructor was called successfully');
-        debugConsole.addLog('LOG', ['✅ SCENE: Constructor was called successfully']);
+        DebugConsole.debug('SCENE', '✅ Constructor was called successfully');
+        debugConsole.addLogLegacy('LOG', ['✅ SCENE: Constructor was called successfully']);
       } else {
         console.log('❌ SCENE: Constructor was NEVER called - this is the bug!');
-        debugConsole.addLog('ERROR', ['❌ SCENE: Constructor was NEVER called - this is the bug!']);
+        debugConsole.addLogLegacy('ERROR', ['❌ SCENE: Constructor was NEVER called - this is the bug!']);
       }
       
     } catch (error) {
@@ -350,12 +352,8 @@ export class Game3DScene {
       throw error;
     }
     
-    console.log('✨ SCENE: Character3D constructor completed. Character object created.');
-    console.log('✨ SCENE: Created 3D character:', {
-      name: characterData.name,
-      class: characterData.characterClass,
-      level: characterData.level
-    });
+    DebugConsole.info('SCENE', '✨ Character3D constructor completed. Character object created.');
+    DebugConsole.info('SCENE', `✨ Created 3D character: ${characterData.name} (${characterData.characterClass})`);
     
     // Set camera to follow character
     this.cameraTarget.copy(this.character.getPosition());
@@ -364,10 +362,8 @@ export class Game3DScene {
     // Debug cube removed
     
     // Debug: Log scene contents
-    console.log(`🔍 SCENE: Scene now has ${this.scene.children.length} children:`);
-    this.scene.children.forEach((child, index) => {
-      console.log(`  ${index}: ${child.type} - ${child.name || 'unnamed'} - visible: ${child.visible}`);
-    });
+    DebugConsole.debug('SCENE', `🔍 Scene has ${this.scene.children.length} children`);
+    DebugConsole.verbose('SCENE', `Scene children: ${this.scene.children.map((child, index) => `${index}:${child.type}`).join(', ')}`, 10000);
   }
   
   private initializeInput(): void {
@@ -427,8 +423,8 @@ export class Game3DScene {
     await this.networkManager.connect();
     
     // Debug: Log multiplayer status
-    console.log('🔍 DEBUG: NetworkManager connected, handlers set up');
-    console.log('🔍 DEBUG: Current other players:', this.otherPlayers.size);
+    DebugConsole.debug('NETWORK', '🔍 NetworkManager connected, handlers set up');
+    DebugConsole.debug('NETWORK', `🔍 Current other players: ${this.otherPlayers.size}`);
   }
   
   private handleMouseClick(event: MouseEvent): void {
@@ -488,18 +484,18 @@ export class Game3DScene {
       targetPosition.z = Math.max(-maxDistance, Math.min(maxDistance, targetPosition.z));
       
       // Move character to clicked position
-      console.log(`🖱️ CLICK: Calling moveToPosition with (${targetPosition.x.toFixed(2)}, ${targetPosition.y.toFixed(2)}, ${targetPosition.z.toFixed(2)})`);
-      console.log(`🖱️ CLICK: Character reference:`, this.character);
-      console.log(`🖱️ CLICK: moveToPosition method:`, typeof this.character?.moveToPosition);
+      DebugConsole.debug('INPUT', `🖱️ Click-to-move: (${targetPosition.x.toFixed(2)}, ${targetPosition.y.toFixed(2)}, ${targetPosition.z.toFixed(2)})`);
+      DebugConsole.verbose('INPUT', `Character reference available: ${!!this.character}`, 2000);
+      DebugConsole.verbose('INPUT', `moveToPosition method type: ${typeof this.character?.moveToPosition}`, 2000);
       
       if (this.character && this.character.moveToPosition) {
         this.character.moveToPosition(targetPosition);
-        console.log(`🖱️ CLICK: moveToPosition called successfully`);
+        DebugConsole.debug('INPUT', '🖱️ moveToPosition called successfully');
       } else {
-        console.error(`🚨 CLICK: Character or moveToPosition method not available!`);
+        DebugConsole.error('INPUT', '🚨 Character or moveToPosition method not available!');
       }
     } else {
-      console.warn('🚨 No valid click target found');
+      DebugConsole.warn('INPUT', '🚨 No valid click target found');
     }
   }
   
@@ -536,7 +532,7 @@ export class Game3DScene {
     // Log movement state changes
     if (characterIsMoving !== wasMoving) {
       const newState = characterIsMoving ? 'moving' : 'stopped';
-      console.log(`🎭 MOVEMENT: Player ${newState}`);
+      DebugConsole.debug('MOVEMENT', `🎭 Player ${newState}`);
     }
     
   }
@@ -560,9 +556,9 @@ export class Game3DScene {
     
     // Debug camera positioning once
     if (!this.cameraDebugLogged) {
-      console.log(`📷 Camera positioned at: (${cameraX.toFixed(1)}, ${cameraY.toFixed(1)}, ${cameraZ.toFixed(1)})`);
-      console.log(`📷 Camera looking at: (${this.cameraTarget.x.toFixed(1)}, ${this.cameraTarget.y.toFixed(1)}, ${this.cameraTarget.z.toFixed(1)})`);
-      console.log(`📷 Character position: (${characterPos.x.toFixed(1)}, ${characterPos.y.toFixed(1)}, ${characterPos.z.toFixed(1)})`);
+      DebugConsole.debug('SCENE', `📷 Camera positioned at: (${cameraX.toFixed(1)}, ${cameraY.toFixed(1)}, ${cameraZ.toFixed(1)})`);
+      DebugConsole.debug('SCENE', `📷 Camera looking at: (${this.cameraTarget.x.toFixed(1)}, ${this.cameraTarget.y.toFixed(1)}, ${this.cameraTarget.z.toFixed(1)})`);
+      DebugConsole.debug('SCENE', `📷 Character position: (${characterPos.x.toFixed(1)}, ${characterPos.y.toFixed(1)}, ${characterPos.z.toFixed(1)})`);
       this.cameraDebugLogged = true;
     }
   }
@@ -570,18 +566,12 @@ export class Game3DScene {
   private handlePlayerJoined(playerData: any): void {
     const playerId = playerData.client_id;
     
-    console.log('🎭 MULTIPLAYER: Player joining 3D world:', {
-      clientId: playerId,
-      name: playerData.character_name,
-      class: playerData.character_class,
-      position: playerData.position,
-      currentPlayers: this.otherPlayers.size
-    });
+    DebugConsole.info('GAMESTATE', `🎭 Player joining: ${playerData.character_name} (${playerData.character_class}) - Total: ${this.otherPlayers.size + 1}`);
     
-    console.log('🔍 DEBUG: handlePlayerJoined called with data:', playerData);
+    DebugConsole.debug('GAMESTATE', `🔍 handlePlayerJoined called with data: ${JSON.stringify(playerData)}`);
     
     if (this.otherPlayers.has(playerId)) {
-      console.log('⚠️ Player already exists, skipping');
+      DebugConsole.warn('GAMESTATE', '⚠️ Player already exists, skipping');
       return;
     }
     
@@ -597,11 +587,7 @@ export class Game3DScene {
       characterName = `Player_${playerId.substring(0, 8)}`;
     }
     
-    console.log(`🏷️ Resolved character name: "${characterName}" from data:`, {
-      character_name: playerData.character_name,
-      name: playerData.name,
-      client_id: playerId
-    });
+    DebugConsole.debug('GAMESTATE', `🏷️ Resolved character name: "${characterName}" from client: ${playerId}`);
     
     const otherPlayer = new Character3D({
       scene: this.scene,
@@ -613,11 +599,17 @@ export class Game3DScene {
       terrainMesh: this.environment?.terrain || undefined // Pass terrain mesh for height detection
     });
     
-    // Keep other players fully opaque (no transparency)
-    // otherPlayer.setOpacity(0.9); // Removed - was making players transparent
+    // Configure as networked player (not main player)
+    otherPlayer.setAsMainPlayer(false);
+    
+    // Enable interpolation for smooth networked movement (interpolation is now enabled by default)
+    if (MovementConfig.INTERPOLATION_ENABLED_BY_DEFAULT) {
+      otherPlayer.setInterpolationEnabled(true);
+      DebugConsole.info('SCENE', `🌐 Enabled interpolation for networked player: ${characterName}`);
+    }
     
     this.otherPlayers.set(playerId, otherPlayer);
-    console.log(`✅ MULTIPLAYER: Created player ${playerData.character_name} at (${spawnX.toFixed(1)}, 1, ${spawnZ.toFixed(1)}). Total players: ${this.otherPlayers.size + 1}`);
+    DebugConsole.info('GAMESTATE', `✅ Created player ${playerData.character_name} at (${spawnX.toFixed(1)}, 1, ${spawnZ.toFixed(1)}). Total players: ${this.otherPlayers.size + 1}`);
   }
   
   private handlePlayerMoved(playerData: any): void {
@@ -629,7 +621,8 @@ export class Game3DScene {
       return;
     }
     
-    console.log(`🏃 MULTIPLAYER: Player ${playerData.character_name} moved to (${playerData.position.x.toFixed(1)}, ${playerData.position.y.toFixed(1)}, ${playerData.position.z.toFixed(1)})`);
+    // Throttle movement logging heavily to reduce spam
+    DebugConsole.verbose('MOVEMENT', `🏃 Player ${playerData.character_name} moved to (${playerData.position.x.toFixed(1)}, ${playerData.position.y.toFixed(1)}, ${playerData.position.z.toFixed(1)})`, 5000);
     
     // Validate position data before applying
     if (!playerData.position || 
@@ -649,9 +642,10 @@ export class Game3DScene {
     
     // Apply animation state FIRST (determines movement behavior)
     if (playerData.animation) {
-      console.log(`🎭 Setting animation state for ${playerData.character_name}: ${playerData.animation}`);
+      // Throttle animation state logging to reduce spam
+      DebugConsole.verbose('ANIMATION', `🎭 Setting animation state for ${playerData.character_name}: ${playerData.animation}`, 2000);
       if (playerData.animation === 'idle') {
-        console.log(`🛑 MULTIPLAYER: Player ${playerData.character_name} stopped moving - setting idle animation`);
+        DebugConsole.debug('ANIMATION', `🛑 Player ${playerData.character_name} stopped moving - setting idle animation`);
       }
       otherPlayer.setAnimationState(playerData.animation as 'idle' | 'walking' | 'running');
     }
@@ -666,7 +660,7 @@ export class Game3DScene {
       );
       const targetRotation = new THREE.Euler().setFromQuaternion(quaternion);
       otherPlayer.setSmoothRotation(targetRotation);
-      console.log(`🔄 DIRECT rotation update for ${playerData.character_name}: Y=${targetRotation.y.toFixed(2)}`);
+      DebugConsole.verbose('MOVEMENT', `🔄 Rotation update for ${playerData.character_name}: Y=${targetRotation.y.toFixed(2)}`, 3000);
     }
     
     // Only apply position update if it's not the origin (which indicates invalid data)
@@ -675,7 +669,7 @@ export class Game3DScene {
     if (!isOriginPosition) {
       // Direct position update - precise and immediate
       otherPlayer.setSmoothPosition(targetPosition);
-      console.log(`📍 DIRECT position update for ${playerData.character_name} to (${targetPosition.x.toFixed(1)}, ${targetPosition.y.toFixed(1)}, ${targetPosition.z.toFixed(1)})`);
+      DebugConsole.verbose('MOVEMENT', `📍 Position update for ${playerData.character_name} to (${targetPosition.x.toFixed(1)}, ${targetPosition.y.toFixed(1)}, ${targetPosition.z.toFixed(1)})`, 3000);
     } else {
       console.warn(`⚠️ Ignoring invalid origin position (0,0,0) for ${playerData.character_name}`);
     }
@@ -734,7 +728,7 @@ export class Game3DScene {
       else if (movementStateChanged) {
         shouldBroadcast = true;
         broadcastReason = isCharacterMoving ? 'started_moving' : 'stopped_moving';
-        console.log(`🎭 MOVEMENT STATE CHANGE: ${broadcastReason} - will broadcast animation state`);
+        DebugConsole.debug('MOVEMENT', `🎭 State change: ${broadcastReason}`);
       }
       // 4. Maximum time delay reached - BUT ONLY when actively moving
       else if (isCharacterMoving && timeSinceLastBroadcast >= this.MAX_BROADCAST_DELAY) {
@@ -760,7 +754,7 @@ export class Game3DScene {
       
       // Only log animation state for significant movement changes
       if (broadcastReason === 'stopped_moving' || broadcastReason === 'started_moving') {
-        console.log(`🎭 MOVEMENT: ${broadcastReason} - animation: ${animationState}`);
+        DebugConsole.debug('MOVEMENT', `🎭 ${broadcastReason} - animation: ${animationState}`);
       }
       
       // Broadcast the update
@@ -772,7 +766,7 @@ export class Game3DScene {
       
       // Only log initial and significant movement state changes
       if (broadcastReason === 'initial' || broadcastReason === 'started_moving' || broadcastReason === 'stopped_moving') {
-        console.log(`📡 Broadcasting: ${animationState} [${broadcastReason}]`);
+        DebugConsole.debug('NETWORK', `📡 Broadcasting: ${animationState} [${broadcastReason}]`);
       }
     }
   }
@@ -803,7 +797,7 @@ export class Game3DScene {
     // Initialize character after environment is ready
     await this.initializeCharacter();
     
-    console.log('🚀 3D Game Scene started successfully!');
+    DebugConsole.info('SCENE', '🚀 3D Game Scene started successfully!');
   }
   
   public update(): void {
@@ -865,8 +859,12 @@ export class Game3DScene {
   private animate = (): void => {
     requestAnimationFrame(this.animate);
     
+    const frameStartTime = PerformanceMonitor.startFrame();
+    
     this.update();
     this.render();
+    
+    PerformanceMonitor.endFrame(frameStartTime);
   };
   
   public handleResize(width: number, height: number): void {

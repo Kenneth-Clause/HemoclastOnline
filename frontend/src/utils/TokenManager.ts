@@ -2,6 +2,8 @@
  * Secure token management utility
  * Uses localStorage with security measures and plans for httpOnly cookies
  */
+import { DebugConsole } from './DebugConsole';
+
 export class TokenManager {
   private static readonly TOKEN_KEY = 'hemoclast_token';
   private static readonly PLAYER_ID_KEY = 'hemoclast_player_id';
@@ -24,7 +26,7 @@ export class TokenManager {
       localStorage.setItem(this.IS_GUEST_KEY, isGuest.toString());
       localStorage.setItem(this.IS_REGISTERED_KEY, (!isGuest).toString());
       
-      console.log('Authentication data stored successfully');
+      DebugConsole.debug('GAMESTATE', 'Authentication data stored successfully');
     } catch (error) {
       console.error('Failed to store authentication data:', error);
       throw new Error('Unable to store authentication data');
@@ -135,7 +137,7 @@ export class TokenManager {
       localStorage.removeItem(this.IS_GUEST_KEY);
       localStorage.removeItem(this.IS_REGISTERED_KEY);
       
-      console.log('Authentication data cleared successfully');
+      DebugConsole.debug('GAMESTATE', 'Authentication data cleared successfully');
     } catch (error) {
       console.error('Failed to clear authentication data:', error);
     }

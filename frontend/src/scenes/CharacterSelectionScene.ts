@@ -6,6 +6,7 @@ import { Scene } from 'phaser';
 import { GameStore } from '../stores/gameStore';
 import { GraphicsUtils } from '../utils/GraphicsUtils';
 import { ResponsiveLayout } from '../utils/ResponsiveLayout';
+import { DebugConsole } from '../utils/DebugConsole';
 
 export class CharacterSelectionScene extends Scene {
   private gameStore: GameStore;
@@ -1021,7 +1022,7 @@ export class CharacterSelectionScene extends Scene {
     }
     
     // Go directly to the 3D game world instead of 2D
-    console.log('🚀 Entering 3D world with character:', selectedCharacterId);
+    DebugConsole.info('GAMESTATE', `🚀 Entering 3D world with character: ${selectedCharacterId}`);
     this.cleanupForm();
     this.scene.start('Game3DTestScene');
   }

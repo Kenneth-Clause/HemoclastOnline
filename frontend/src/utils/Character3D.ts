@@ -23,7 +23,7 @@ export interface Character3DConfig {
 
 export class Character3D {
   static test() {
-    console.log('🧪 Character3D SIMPLIFIED VERSION 4.0 - Direct GLTF Loading');
+    DebugConsole.info('SYSTEM', '🧪 Character3D SIMPLIFIED VERSION 4.0 - Direct GLTF Loading');
     return true;
   }
   
@@ -48,8 +48,9 @@ export class Character3D {
   // Smooth interpolation for all networked players (enhancement overlay)
   private networkTargetPosition: THREE.Vector3 | null = null;
   private networkTargetRotation: THREE.Euler | null = null;
-  private interpolationEnabled: boolean = false; // Disabled by default - core networking works first
+  private interpolationEnabled: boolean = MovementConfig.INTERPOLATION_ENABLED_BY_DEFAULT; // Enable by default for smooth movement
   private isMainPlayer: boolean = false; // True for the player you control, false for other networked players
+  private lastNetworkUpdateTime: number = 0; // Track when last network update was received
   
   // References
   private scene: THREE.Scene;
@@ -68,11 +69,11 @@ export class Character3D {
 
   constructor(config: Character3DConfig) {
     const debugConsole = DebugConsole.getInstance();
-    debugConsole.addLog('WARN', ['🚨 CHARACTER3D SIMPLIFIED VERSION 4.0 - Direct GLTF Loading 🚨']);
+    debugConsole.addLogLegacy('WARN', ['🚨 CHARACTER3D SIMPLIFIED VERSION 4.0 - Direct GLTF Loading 🚨']);
     
     // Debug flag for Game3DScene
     (window as any).CHARACTER3D_CONSTRUCTOR_CALLED = true;
-    console.log('🎬 CHARACTER3D: Constructor called successfully');
+    DebugConsole.debug('SYSTEM', '🎬 CHARACTER3D: Constructor called successfully');
     
     // Store references
     this.scene = config.scene;
@@ -105,16 +106,16 @@ export class Character3D {
     this.movementDirection.set(0, 0, 0);
     this.animationState = 'idle'; // Explicitly set initial animation state
     
-    console.log(`✅ Character3D simplified constructor completed for ${this.name}`);
-    console.log(`🎬 CHARACTER3D: Constructor finished - methods should be available`);
+    DebugConsole.debug('SYSTEM', `✅ Character3D constructor completed for ${this.name}`);
+    DebugConsole.debug('SYSTEM', `🎬 CHARACTER3D: Constructor finished - methods available`);
   }
   
   private async loadCharacter(config: Character3DConfig): Promise<void> {
     const debugConsole = DebugConsole.getInstance();
     const modelPath = config.modelPath || '/models/characters/Godot/default_anims.glb';
     
-    console.log(`🔄 LOADING: Starting loadCharacter for ${this.name}`);
-    debugConsole.addLog('WARN', [`🔄 SIMPLE: Loading GLTF directly: ${modelPath}`]);
+    DebugConsole.debug('ASSETS', `🔄 Loading character: ${this.name}`);
+    debugConsole.addLogLegacy('WARN', [`🔄 SIMPLE: Loading GLTF directly: ${modelPath}`]);
     
     try {
       const loader = new GLTFLoader();
@@ -136,7 +137,7 @@ export class Character3D {
         // IMPORTANT: Don't add model to scene yet - set up animations first to avoid bind pose flash
         this.model.position.set(0, 0, 0);
         
-        console.log(`📏 Model prepared but not added to scene yet - will add after animation setup`);
+        DebugConsole.debug('SCENE', `📏 Model prepared, will add after animation setup`);
       }
       
       // Setup materials for visibility
@@ -151,21 +152,21 @@ export class Character3D {
       // NOW position the character after animations are set up
       this.positionCharacterOnGround();
       
-      debugConsole.addLog('LOG', [`✅ SIMPLE: Character loaded successfully. Group children: ${this.group.children.length}`]);
-      console.log(`✅ SIMPLE: Character ${this.name} loaded with ${this.animations.length} animations`);
+      debugConsole.addLogLegacy('LOG', [`✅ SIMPLE: Character loaded successfully. Group children: ${this.group.children.length}`]);
+      DebugConsole.info('ASSETS', `✅ Character ${this.name} loaded with ${this.animations.length} animations`);
       
     } catch (error) {
-      debugConsole.addLog('ERROR', [`❌ SIMPLE: Failed to load character: ${error}`]);
-      console.error(`❌ Failed to load character ${this.name}:`, error);
+      debugConsole.addLogLegacy('ERROR', [`❌ SIMPLE: Failed to load character: ${error}`]);
+      DebugConsole.error('ASSETS', `❌ Failed to load character ${this.name}:`, error);
       
       // Make character visible anyway to prevent permanent invisibility
       this.group.visible = true;
-      console.log(`👁️ Character made visible due to loading error`);
+      DebugConsole.warn('ASSETS', `👁️ Character made visible due to loading error`);
       
       // Still mark as initialized to prevent indefinite waiting
       setTimeout(() => {
         this.isFullyInitialized = true;
-        console.log(`✅ Character ${this.name} marked as initialized despite loading error`);
+        DebugConsole.warn('ASSETS', `✅ Character ${this.name} marked as initialized despite loading error`);
       }, 100);
       
       throw error;
@@ -188,7 +189,7 @@ export class Character3D {
       }
     });
     
-    console.log(`🎨 Applied materials to character model`);
+    DebugConsole.debug('ASSETS', `🎨 Applied materials to character model`);
   }
   
   private createNameplate(): void {
@@ -226,7 +227,7 @@ export class Character3D {
     this.nameplate.scale.set(3.5, 1.15, 1); // Just a bit bigger for better visibility
     
     this.group.add(this.nameplate);
-    console.log(`🏷️ Created enhanced nameplate for ${cleanName}`);
+    DebugConsole.debug('SCENE', `🏷️ Created nameplate for ${cleanName}`);
   }
   
   private createPhysicsBody(position: THREE.Vector3): void {
@@ -254,25 +255,24 @@ export class Character3D {
     // Position so feet are just above ground level
     this.model.position.set(0, -minY - 0, 0); // Raise character up to proper ground level
     
-    console.log(`🔧 FINAL: Positioned character after animation setup - height: ${modelHeight.toFixed(2)}, y: ${(-minY - 0.85).toFixed(2)}`);
+    DebugConsole.debug('SCENE', `🔧 Positioned character: height=${modelHeight.toFixed(2)}, y=${(-minY - 0.85).toFixed(2)}`);
   }
   
   private setupAnimations(): void {
     if (!this.mixer || this.animations.length === 0) return;
     
     // List all available animations first with detailed info
-    console.log(`🎭 DETAILED: Available animations (${this.animations.length}):`);
-    this.animations.forEach((clip, index) => {
-      console.log(`  ${index}: "${clip.name}" - Duration: ${clip.duration.toFixed(2)}s - Tracks: ${clip.tracks.length}`);
-    });
+    DebugConsole.debug('ASSETS', `🎭 Available animations (${this.animations.length}): ${this.animations.map(clip => clip.name).join(', ')}`);
+    // Detailed animation info only in verbose mode
+    DebugConsole.verbose('ASSETS', `Animation details: ${this.animations.map(clip => `${clip.name}(${clip.duration.toFixed(2)}s)`).join(', ')}`, 10000);
     
     // Try different animation selection strategies
-    console.log(`🔍 ANALYSIS: Looking for idle animations...`);
+    DebugConsole.debug('ANIMATION', `🔍 Looking for idle animations...`);
     
     // Strategy 1: Look for exact matches first
     let idleClip = this.animations.find(clip => clip.name === 'Idle_Loop');
     if (idleClip) {
-      console.log(`✅ FOUND: Exact match "Idle_Loop"`);
+      DebugConsole.debug('ANIMATION', `✅ Found idle animation: "Idle_Loop"`);
     } else {
       // Strategy 2: Look for other idle variations
       idleClip = this.animations.find(clip => 
@@ -281,14 +281,14 @@ export class Character3D {
         clip.name === 'IDLE'
       );
       if (idleClip) {
-        console.log(`✅ FOUND: Idle variation "${idleClip.name}"`);
+        DebugConsole.debug('ANIMATION', `✅ Found idle variation: "${idleClip.name}"`);
       } else {
         // Strategy 3: Look for anything containing "idle"
         idleClip = this.animations.find(clip => 
           clip.name.toLowerCase().includes('idle')
         );
         if (idleClip) {
-          console.log(`✅ FOUND: Contains idle "${idleClip.name}"`);
+          DebugConsole.debug('ANIMATION', `✅ Found idle animation: "${idleClip.name}"`);
         } else {
           // Strategy 4: Look for standing poses
           idleClip = this.animations.find(clip => 
@@ -296,12 +296,12 @@ export class Character3D {
             clip.name.toLowerCase().includes('pose')
           );
           if (idleClip) {
-            console.log(`✅ FOUND: Standing pose "${idleClip.name}"`);
+            DebugConsole.debug('ANIMATION', `✅ Found standing pose: "${idleClip.name}"`);
           } else {
             // Strategy 5: Use first animation as fallback
             if (this.animations.length > 0) {
               idleClip = this.animations[0];
-              console.log(`⚠️ FALLBACK: Using first animation "${idleClip.name}"`);
+              DebugConsole.warn('ANIMATION', `⚠️ Fallback: Using first animation "${idleClip.name}"`);
             }
           }
         }
@@ -309,13 +309,13 @@ export class Character3D {
     }
     
     if (idleClip) {
-      console.log(`🎭 PROPER SETUP: Setting up idle animation the RIGHT way for ${idleClip.name}`);
+      DebugConsole.debug('ANIMATION', `🎭 Setting up idle animation: ${idleClip.name}`);
       
       // FIRST: Add the model to the scene BEFORE setting up animations
       // This ensures the animation mixer has a proper scene context
       if (this.model && this.model.parent !== this.group) {
         this.group.add(this.model);
-        console.log(`📏 Model added to scene FIRST - before animation setup`);
+        DebugConsole.debug('SCENE', `📏 Model added to scene before animation setup`);
       }
       
       // SECOND: Now set up the animation with the model properly in the scene
@@ -332,43 +332,43 @@ export class Character3D {
       this.currentAction.play();
       
       this.animationState = 'idle';
-      console.log(`🎭 PROPER SETUP: Idle animation configured with model in scene: ${idleClip.name}`);
+      DebugConsole.debug('ANIMATION', `🎭 Idle animation configured: ${idleClip.name}`);
       
       // THIRD: Apply animation updates with the model properly in the scene
       for (let i = 0; i < 10; i++) {
         this.mixer.update(0.016); // Just a few updates to establish the pose
       }
       
-      console.log(`🎭 PROPER SETUP: Applied animation updates with model in scene`);
+      DebugConsole.debug('ANIMATION', `🎭 Applied animation updates`);
       
       // FOURTH: Make the character visible
       this.group.visible = true;
-      console.log(`👁️ Character made visible with proper animation setup`);
+      DebugConsole.info('SCENE', `👁️ Character made visible: ${this.name}`);
       
       // Mark as fully initialized after reasonable delay
       setTimeout(() => {
         this.isFullyInitialized = true;
-        console.log(`✅ Character ${this.name} fully initialized and ready - Animation state: ${this.animationState}`);
+        DebugConsole.info('SYSTEM', `✅ Character ${this.name} fully initialized - Animation: ${this.animationState}`);
       }, 300); // Short delay
       
     } else {
-      console.error(`❌ CRITICAL: No idle animation found!`);
-      this.animations.forEach(clip => console.error(`Available: ${clip.name}`));
+      DebugConsole.error('ANIMATION', `❌ CRITICAL: No idle animation found!`);
+      DebugConsole.error('ANIMATION', `Available animations: ${this.animations.map(clip => clip.name).join(', ')}`);
       
       // Add the model to scene even without animations
       if (this.model && this.model.parent !== this.group) {
         this.group.add(this.model);
-        console.log(`📏 Model added to scene without animations`);
+        DebugConsole.warn('SCENE', `📏 Model added to scene without animations`);
       }
       
       // Make character visible even without animations
       this.group.visible = true;
-      console.log(`👁️ Character made visible without animations`);
+      DebugConsole.warn('SCENE', `👁️ Character made visible without animations`);
       
       // Even without animations, mark as initialized
       setTimeout(() => {
         this.isFullyInitialized = true;
-        console.log(`✅ Character ${this.name} marked as initialized without animations`);
+        DebugConsole.warn('SYSTEM', `✅ Character ${this.name} marked as initialized without animations`);
       }, 100);
     }
   }
@@ -398,10 +398,10 @@ export class Character3D {
     // Update animation only when movement state actually changes
     if (this.isMoving && !wasMoving) {
       this.playAnimation('walking');
-      console.log(`🏃 MOVEMENT: ${this.name} started moving - animation: walking`);
+      DebugConsole.debug('MOVEMENT', `🏃 ${this.name} started moving`);
     } else if (!this.isMoving && wasMoving) {
       this.playAnimation('idle');
-      console.log(`🛑 MOVEMENT: ${this.name} stopped moving - animation: idle`);
+      DebugConsole.debug('MOVEMENT', `🛑 ${this.name} stopped moving`);
     }
   }
   
@@ -420,7 +420,7 @@ export class Character3D {
     
     // Gentle spawn protection: Only fix obvious issues
     if (!this.isFullyInitialized && this.animationState === 'walking' && !this.targetPosition && this.movementDirection.length() === 0) {
-      console.log(`🔧 Gentle spawn protection: Fixing walking animation during spawn`);
+      DebugConsole.debug('MOVEMENT', `🔧 Gentle spawn protection: Fixing walking animation during spawn`);
       this.animationState = 'walking'; // Force change
       this.playAnimation('idle');
     }
@@ -443,7 +443,7 @@ export class Character3D {
       
       // If we're close and not moving much, stop immediately
       if (targetDistance < 0.2 && currentVelocity < 0.5) {
-        console.log(`🛑 UPDATE LOOP STOP: Distance ${targetDistance.toFixed(3)}, velocity ${currentVelocity.toFixed(3)}`);
+        DebugConsole.debug('MOVEMENT', `🛑 UPDATE LOOP STOP: Distance ${targetDistance.toFixed(3)}, velocity ${currentVelocity.toFixed(3)}`);
         this.targetPosition = null;
         this.isMoving = false;
         this.physicsBody.velocity.set(0, 0, 0);
@@ -464,13 +464,13 @@ export class Character3D {
       
       // Only correct if there's a clear mismatch AND physics confirms the state
       if (shouldBeMoving && !actuallyMoving && this.animationState === 'walking') {
-        console.log('🔧 Animation state correction: stuck walking but not moving - forcing idle');
+        DebugConsole.debug('ANIMATION', '🔧 Animation state correction: stuck walking but not moving - forcing idle');
         this.targetPosition = null;
         this.isMoving = false;
         this.animationState = 'walking'; // Force change
         this.playAnimation('idle');
       } else if (!shouldBeMoving && actuallyMoving && this.animationState === 'idle') {
-        console.log('🔧 Animation state correction: moving but idle - forcing walking');
+        DebugConsole.debug('ANIMATION', '🔧 Animation state correction: moving but idle - forcing walking');
         this.playAnimation('walking');
       }
     }
@@ -482,10 +482,12 @@ export class Character3D {
   }
   
   private updateNetworkInterpolation(deltaTime: number): void {
-    // Smooth interpolation enhancement
-    const lerpFactor = MovementConfig.getNetworkLerpFactor(deltaTime);
+    // Enhanced interpolation with proper smoothing and prediction
+    const currentTime = Date.now();
+    const timeSinceLastUpdate = currentTime - this.lastNetworkUpdateTime;
+    const isStaleMessage = timeSinceLastUpdate > 300; // Consider messages older than 300ms as stale
     
-    // Interpolate position
+    // Interpolate position with improved logic
     if (this.networkTargetPosition) {
       const currentPos = this.group.position;
       const distance = currentPos.distanceTo(this.networkTargetPosition);
@@ -494,18 +496,58 @@ export class Character3D {
         // If too far, teleport to prevent sliding across map
         this.group.position.copy(this.networkTargetPosition);
         this.networkTargetPosition = null; // Clear target after teleport
-        console.log(`🚀 ${this.name}: Teleported to target (distance was ${distance.toFixed(2)})`);
-      } else if (distance > 0.05) {
-        // Smooth interpolation
-        this.group.position.lerp(this.networkTargetPosition, lerpFactor);
+        DebugConsole.debug('MOVEMENT', `🚀 ${this.name}: Teleported to target (distance was ${distance.toFixed(2)})`);
+        
+        // Sync physics body when teleporting
+        if (this.physicsBody) {
+          this.physicsBody.position.copy(this.networkTargetPosition as any);
+          this.physicsBody.velocity.set(0, 0, 0);
+        }
+      } else if (distance > 0.02) { // Reduced threshold for smoother movement
+        // Use adaptive interpolation factor
+        const adaptiveLerpFactor = MovementConfig.getAdaptiveInterpolationFactor(deltaTime, distance, isStaleMessage);
+        this.group.position.lerp(this.networkTargetPosition, adaptiveLerpFactor);
+        
+        // Sync physics body position smoothly
+        if (this.physicsBody) {
+          const targetPhysicsPos = new CANNON.Vec3(
+            this.group.position.x,
+            this.group.position.y,
+            this.group.position.z
+          );
+          this.physicsBody.position.copy(targetPhysicsPos);
+          
+          // Apply velocity towards target for natural movement
+          const velocityDirection = new CANNON.Vec3(
+            this.networkTargetPosition.x - this.group.position.x,
+            0,
+            this.networkTargetPosition.z - this.group.position.z
+          );
+          if (velocityDirection.length() > 0.001) {
+            velocityDirection.normalize();
+            const velocityMagnitude = Math.min(distance * MovementConfig.BASE_MOVE_SPEED * 0.5, MovementConfig.BASE_MOVE_SPEED);
+            velocityDirection.scale(velocityMagnitude);
+            this.physicsBody.velocity.set(velocityDirection.x, 0, velocityDirection.z);
+          }
+        }
+        
+        DebugConsole.verbose('MOVEMENT', `🌐 ${this.name}: Interpolating to target, distance: ${distance.toFixed(2)}, factor: ${adaptiveLerpFactor.toFixed(3)}`, 5000);
       } else {
         // Close enough - snap to target and clear
         this.group.position.copy(this.networkTargetPosition);
         this.networkTargetPosition = null;
+        
+        // Stop physics movement when reaching target
+        if (this.physicsBody) {
+          this.physicsBody.position.copy(this.group.position as any);
+          this.physicsBody.velocity.set(0, 0, 0);
+        }
+        
+        DebugConsole.verbose('MOVEMENT', `✅ ${this.name}: Reached interpolation target`, 3000);
       }
     }
     
-    // Interpolate rotation
+    // Interpolate rotation with improved smoothing
     if (this.networkTargetRotation) {
       const currentRot = this.group.rotation;
       const targetQuat = new THREE.Quaternion().setFromEuler(this.networkTargetRotation);
@@ -514,19 +556,25 @@ export class Character3D {
       // Check if rotation difference is significant
       const rotationDifference = currentQuat.angleTo(targetQuat);
       
-      if (rotationDifference > 0.05) {
-        // Smooth rotation interpolation
-        currentQuat.slerp(targetQuat, lerpFactor);
+      if (rotationDifference > 0.02) { // Reduced threshold for smoother rotation
+        // Use adaptive rotation interpolation
+        const rotationFactor = MovementConfig.getAdaptiveInterpolationFactor(deltaTime, rotationDifference * 10, isStaleMessage);
+        const adaptiveRotationFactor = Math.min(rotationFactor * 1.5, 0.9); // Slightly faster rotation
+        currentQuat.slerp(targetQuat, adaptiveRotationFactor);
         this.group.rotation.setFromQuaternion(currentQuat);
+        
+        DebugConsole.verbose('MOVEMENT', `🔄 ${this.name}: Rotating, diff: ${rotationDifference.toFixed(3)}, factor: ${adaptiveRotationFactor.toFixed(3)}`, 5000);
       } else {
         // Close enough - snap to target and clear
         this.group.rotation.copy(this.networkTargetRotation);
         this.networkTargetRotation = null;
+        
+        DebugConsole.verbose('MOVEMENT', `✅ ${this.name}: Reached rotation target`, 3000);
       }
     }
   }
   
-  private updateMovement(deltaTime: number): void {
+  private updateMovement(_deltaTime: number): void {
     if (!this.physicsBody) return;
     
     const velocity = new CANNON.Vec3(0, 0, 0);
@@ -554,7 +602,7 @@ export class Character3D {
         this.physicsBody.velocity.set(0, 0, 0);
         this.playAnimation('idle');
         if (wasMoving) {
-          console.log(`🛑 CLICK-TO-MOVE: ${this.name} reached target - animation: idle`);
+          DebugConsole.debug('MOVEMENT', `🛑 CLICK-TO-MOVE: ${this.name} reached target - animation: idle`);
         }
       }
     } else if (this.movementDirection.length() > 0) {
@@ -583,7 +631,7 @@ export class Character3D {
   /**
    * Get the terrain height at a specific X,Z position using raycasting
    */
-  private getTerrainHeight(x: number, z: number): number {
+  private _getTerrainHeight(x: number, z: number): number {
     if (!this.terrainMesh) {
       return 0; // Default ground level if no terrain mesh
     }
@@ -618,7 +666,7 @@ export class Character3D {
     const targetClip = this.animations.find(clip => clip.name === targetAnimName);
     
     if (!targetClip) {
-      console.warn(`❌ Animation not found: ${targetAnimName}`);
+      DebugConsole.warn('ANIMATION', `❌ Animation not found: ${targetAnimName}`);
       return;
     }
     
@@ -656,7 +704,7 @@ export class Character3D {
     this.currentAction = newAction;
     this.animationState = animationName;
     
-    console.log(`🎭 Playing animation: ${targetAnimName} (transition from ${previousAction?.getClip().name || 'none'})`);
+    DebugConsole.debug('ANIMATION', `🎭 Playing animation: ${targetAnimName} (transition from ${previousAction?.getClip().name || 'none'})`);
     
     // Notify about animation state change for immediate network broadcasting
     if (this.onAnimationStateChanged) {
@@ -671,7 +719,7 @@ export class Character3D {
   
   public setPosition(position: THREE.Vector3): void {
     // Debug: Log when position is being set directly
-    console.log(`🔧 POSITION: Setting ${this.name} position to (${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)})`);
+    DebugConsole.verbose('MOVEMENT', `🔧 Setting ${this.name} position to (${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)})`, 3000);
     
     this.group.position.copy(position);
     if (this.physicsBody) {
@@ -711,7 +759,7 @@ export class Character3D {
   }
   
   public emergencyStop(): void {
-    console.log('🚨 EMERGENCY STOP: Forcing complete movement and animation stop');
+    DebugConsole.warn('MOVEMENT', '🚨 EMERGENCY STOP: Forcing complete movement and animation stop');
     
     // Clear ALL movement states aggressively
     this.targetPosition = null;
@@ -738,7 +786,7 @@ export class Character3D {
     }
     
     // Verify all states are cleared
-    console.log(`🔍 Emergency stop complete - isMoving: ${this.isMoving}, hasTarget: ${this.targetPosition !== null}, isCurrentlyMoving: ${this.isCurrentlyMoving()}`);
+    DebugConsole.debug('MOVEMENT', `🔍 Emergency stop complete - isMoving: ${this.isMoving}, hasTarget: ${this.targetPosition !== null}, isCurrentlyMoving: ${this.isCurrentlyMoving()}`);
   }
   
   public setAnimationState(state: 'idle' | 'walking' | 'running'): void {
@@ -749,12 +797,12 @@ export class Character3D {
   
   public setTerrainMesh(terrainMesh: THREE.Mesh | null): void {
     this.terrainMesh = terrainMesh;
-    console.log(`🏔️ Terrain mesh ${terrainMesh ? 'set' : 'cleared'} for character ${this.name}`);
+    DebugConsole.debug('SCENE', `🏔️ Terrain mesh ${terrainMesh ? 'set' : 'cleared'} for character ${this.name}`);
   }
   
   public setInterpolationEnabled(enabled: boolean): void {
     this.interpolationEnabled = enabled;
-    console.log(`🌐 ${this.name}: Interpolation ${enabled ? 'enabled' : 'disabled'}`);
+    DebugConsole.debug('MOVEMENT', `🌐 ${this.name}: Interpolation ${enabled ? 'enabled' : 'disabled'}`);
     
     // Clear any pending interpolation targets when disabling
     if (!enabled) {
@@ -765,55 +813,61 @@ export class Character3D {
   
   public setAsMainPlayer(isMain: boolean = true): void {
     this.isMainPlayer = isMain;
-    console.log(`👤 ${this.name}: Set as ${isMain ? 'MAIN' : 'OTHER'} player`);
+    DebugConsole.info('SYSTEM', `👤 ${this.name}: Set as ${isMain ? 'MAIN' : 'OTHER'} player`);
   }
   
   public setSmoothPosition(targetPosition: THREE.Vector3): void {
-    console.log(`🔧 DEBUG: setSmoothPosition called for ${this.name}, interpolation: ${this.interpolationEnabled}`);
+    // Update network timing for adaptive interpolation
+    this.lastNetworkUpdateTime = Date.now();
+    
+    DebugConsole.verbose('PHYSICS', `setSmoothPosition called for ${this.name}, interpolation: ${this.interpolationEnabled}`, 5000);
     
     if (this.interpolationEnabled) {
       // Set up smooth interpolation target
       this.networkTargetPosition = targetPosition.clone();
-      console.log(`🌐 ${this.name}: Set interpolation target (${targetPosition.x.toFixed(2)}, ${targetPosition.y.toFixed(2)}, ${targetPosition.z.toFixed(2)})`);
+      DebugConsole.verbose('MOVEMENT', `🌐 ${this.name}: Set interpolation target (${targetPosition.x.toFixed(2)}, ${targetPosition.y.toFixed(2)}, ${targetPosition.z.toFixed(2)})`, 3000);
     } else {
       // Fallback: Direct position setting (reliable)
       // IMPORTANT: Clear physics velocity when setting network position to prevent drift
       if (this.physicsBody) {
         this.physicsBody.velocity.set(0, 0, 0);
-        console.log(`🛑 ${this.name}: Cleared physics velocity for network position`);
+        DebugConsole.verbose('PHYSICS', `${this.name}: Cleared physics velocity for network position`, 3000);
       }
       this.setPosition(targetPosition);
-      console.log(`📍 ${this.name}: Direct position set (${targetPosition.x.toFixed(2)}, ${targetPosition.y.toFixed(2)}, ${targetPosition.z.toFixed(2)})`);
+      DebugConsole.verbose('MOVEMENT', `📍 ${this.name}: Direct position set (${targetPosition.x.toFixed(2)}, ${targetPosition.y.toFixed(2)}, ${targetPosition.z.toFixed(2)})`, 3000);
     }
   }
   
   public setSmoothRotation(targetRotation: THREE.Euler): void {
+    // Update network timing for adaptive interpolation
+    this.lastNetworkUpdateTime = Date.now();
+    
     if (this.interpolationEnabled) {
       // Set up smooth interpolation target
       this.networkTargetRotation = targetRotation.clone();
-      console.log(`🔄 ${this.name}: Set rotation target Y=${targetRotation.y.toFixed(2)}`);
+      DebugConsole.verbose('MOVEMENT', `🔄 ${this.name}: Set rotation target Y=${targetRotation.y.toFixed(2)}`, 3000);
     } else {
       // Fallback: Direct rotation setting (reliable)
       this.setRotation(targetRotation);
-      console.log(`🔄 ${this.name}: Direct rotation set Y=${targetRotation.y.toFixed(2)}`);
+      DebugConsole.verbose('MOVEMENT', `🔄 ${this.name}: Direct rotation set Y=${targetRotation.y.toFixed(2)}`, 3000);
     }
   }
   
   
   public debugAnimationState(): void {
-    console.log(`🔍 DEBUG ${this.name}: Animation State Report`);
-    console.log(`  - animationState: ${this.animationState}`);
-    console.log(`  - isFullyInitialized: ${this.isFullyInitialized}`);
-    console.log(`  - targetPosition: ${this.targetPosition ? 'SET' : 'NULL'}`);
-    console.log(`  - isMoving: ${this.isMoving}`);
-    console.log(`  - movementDirection length: ${this.movementDirection.length()}`);
-    console.log(`  - currentAction: ${this.currentAction?.getClip().name || 'NULL'}`);
-    console.log(`  - mixer: ${this.mixer ? 'ACTIVE' : 'NULL'}`);
+    DebugConsole.info('DEBUG', `🔍 ${this.name}: Animation State Report`);
+    DebugConsole.info('DEBUG', `  - animationState: ${this.animationState}`);
+    DebugConsole.info('DEBUG', `  - isFullyInitialized: ${this.isFullyInitialized}`);
+    DebugConsole.info('DEBUG', `  - targetPosition: ${this.targetPosition ? 'SET' : 'NULL'}`);
+    DebugConsole.info('DEBUG', `  - isMoving: ${this.isMoving}`);
+    DebugConsole.info('DEBUG', `  - movementDirection length: ${this.movementDirection.length()}`);
+    DebugConsole.info('DEBUG', `  - currentAction: ${this.currentAction?.getClip().name || 'NULL'}`);
+    DebugConsole.info('DEBUG', `  - mixer: ${this.mixer ? 'ACTIVE' : 'NULL'}`);
     
     if (this.currentAction) {
-      console.log(`  - currentAction enabled: ${this.currentAction.enabled}`);
-      console.log(`  - currentAction weight: ${this.currentAction.getEffectiveWeight()}`);
-      console.log(`  - currentAction time: ${this.currentAction.time}`);
+      DebugConsole.info('DEBUG', `  - currentAction enabled: ${this.currentAction.enabled}`);
+      DebugConsole.info('DEBUG', `  - currentAction weight: ${this.currentAction.getEffectiveWeight()}`);
+      DebugConsole.info('DEBUG', `  - currentAction time: ${this.currentAction.time}`);
     }
   }
   
@@ -843,6 +897,6 @@ export class Character3D {
       }
     });
     
-    console.log(`🧹 Destroyed character: ${this.name}`);
+    DebugConsole.info('SYSTEM', `🧹 Destroyed character: ${this.name}`);
   }
 }

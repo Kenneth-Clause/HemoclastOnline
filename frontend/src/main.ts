@@ -58,4 +58,6 @@ window.addEventListener('orientationchange', () => {
 // Initial resize
 handleResize();
 
-console.log('🩸 HemoclastOnline initialized - Gothic Fantasy Awaits...');
+import('./utils/DebugConsole').then(({ DebugConsole }) => {
+  DebugConsole.info('GENERAL', '🩸 HemoclastOnline initialized - Gothic Fantasy Awaits...');
+});

@@ -7,6 +7,7 @@ import { GameStore } from '../stores/gameStore';
 import { GraphicsUtils } from '../utils/GraphicsUtils';
 import { GothicTitleUtils } from '../utils/GothicTitleUtils';
 import { ResponsiveLayout } from '../utils/ResponsiveLayout';
+import { DebugConsole } from '../utils/DebugConsole';
 
 export class CharacterCreationScene extends Scene {
   private gameStore: GameStore;
@@ -853,7 +854,7 @@ export class CharacterCreationScene extends Scene {
         'Authorization': `Bearer ${token}`
       };
       
-      console.log('Creating character:', { name: this.characterName, character_class: this.selectedClass });
+      DebugConsole.info('GAMESTATE', `Creating character: ${this.characterName} (${this.selectedClass})`);
       
       const response = await fetch('/api/v1/characters/', {
         method: 'POST',
@@ -864,7 +865,7 @@ export class CharacterCreationScene extends Scene {
         })
       });
       
-      console.log('Response status:', response.status);
+      DebugConsole.debug('GAMESTATE', `Character creation response status: ${response.status}`);
       
       if (response.ok) {
         const character = await response.json();

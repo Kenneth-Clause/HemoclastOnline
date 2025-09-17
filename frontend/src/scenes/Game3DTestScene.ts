@@ -7,6 +7,7 @@ import { Scene } from 'phaser';
 import { GameStore } from '../stores/gameStore';
 import { Game3DScene } from './Game3DScene';
 import { GothicTitleUtils } from '../utils/GothicTitleUtils';
+import { DebugConsole } from '../utils/DebugConsole';
 
 export class Game3DTestScene extends Scene {
   private gameStore: GameStore;
@@ -41,7 +42,7 @@ export class Game3DTestScene extends Scene {
     // Handle window resize
     this.scale.on('resize', this.handleResize, this);
     
-    console.log('🎮 3D Test Scene created');
+    DebugConsole.info('SCENE', '🎮 3D Test Scene created');
   }
   
   private createThreeJSContainer(): void {
@@ -79,7 +80,7 @@ export class Game3DTestScene extends Scene {
       // Start the 3D scene
       await this.game3D.start();
       
-      console.log('✅ 3D Scene initialized successfully');
+      DebugConsole.info('SCENE', '✅ 3D Scene initialized successfully');
       
     } catch (error) {
       console.error('❌ Failed to initialize 3D scene:', error);
@@ -221,7 +222,7 @@ export class Game3DTestScene extends Scene {
   }
   
   private returnToMenu(): void {
-    console.log('🔄 Returning to Menu');
+    DebugConsole.info('SCENE', '🔄 Returning to Menu');
     
     // Clean up 3D scene
     if (this.game3D) {
@@ -314,7 +315,7 @@ export class Game3DTestScene extends Scene {
     // Remove event listeners
     this.scale.off('resize', this.handleResize);
     
-    console.log('🧹 3D Test Scene cleaned up');
+    DebugConsole.info('SCENE', '🧹 3D Test Scene cleaned up');
     
     // Call parent destroy
     super.destroy();
