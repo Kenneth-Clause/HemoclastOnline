@@ -399,7 +399,7 @@ export class Game3DScene {
       this.cameraDistance += event.deltaY * 0.01;
       this.cameraDistance = Math.max(5, Math.min(30, this.cameraDistance));
       event.preventDefault();
-    });
+    }, { passive: false });
   }
   
   private async initializeNetworking(): Promise<void> {
@@ -798,6 +798,7 @@ export class Game3DScene {
     await this.initializeCharacter();
     
     DebugConsole.info('SCENE', '🚀 3D Game Scene started successfully!');
+    console.log('🎮 3D Game Scene Active - UI system ready!');
   }
   
   public update(): void {

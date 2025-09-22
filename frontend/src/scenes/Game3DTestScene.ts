@@ -7,12 +7,14 @@ import { Scene } from 'phaser';
 import { GameStore } from '../stores/gameStore';
 import { Game3DScene } from './Game3DScene';
 import { GothicTitleUtils } from '../utils/GothicTitleUtils';
+import { createDirectUI, DirectUIActivation } from '../utils/DirectUIActivation';
 import { DebugConsole } from '../utils/DebugConsole';
 
 export class Game3DTestScene extends Scene {
   private gameStore: GameStore;
   private game3D: Game3DScene | null = null;
   private threejsContainer: HTMLElement | null = null;
+  private directUI: DirectUIActivation | null = null;
   
   // UI elements
   private instructionsText: Phaser.GameObjects.Text | null = null;
@@ -39,10 +41,34 @@ export class Game3DTestScene extends Scene {
     // Create UI overlay
     this.createUIOverlay();
     
+    // Activate UI system directly in this scene
+    console.log('🎯 Game3DTestScene: Activating UI system directly...');
+    
+    // Add a small delay to ensure everything is ready
+    this.time.delayedCall(1000, () => {
+      this.directUI = createDirectUI(this);
+      console.log('✅ Game3DTestScene: Direct UI system activated!');
+    });
+    
     // Handle window resize
     this.scale.on('resize', this.handleResize, this);
     
-    DebugConsole.info('SCENE', '🎮 3D Test Scene created');
+    // Add keyboard shortcut for manual UI activation
+    this.input.keyboard?.on('keydown-U', () => {
+      this.activateUISystem();
+    });
+    
+    DebugConsole.info('SCENE', '🎮 3D Test Scene created with full UI system');
+    console.log('🎮 3D Scene with Complete UI System Active!');
+    console.log('🎯 Press the keyboard shortcuts to test all UI components:');
+    console.log('  I - Inventory, C - Character Sheet, J - Quest Tracker');
+    console.log('  G - Guild Panel, O - Friends List, Y - Achievements, L - Daily Tasks');
+    console.log('  F12 - Toggle all UI, F1-F3 - Toggle individual components');
+    console.log('');
+    console.log('🔧 If UI is not visible:');
+    console.log('  - Click the "🎮 Activate UI System" button');
+    console.log('  - Or press U key to manually activate');
+    console.log('  - Or use console: activateFullUIDemo()');
   }
   
   private createThreeJSContainer(): void {
@@ -147,6 +173,28 @@ export class Game3DTestScene extends Scene {
       }
     );
     
+    // UI activation button (fallback if UI doesn't auto-load)
+    const uiButton = GothicTitleUtils.createEnhancedGothicButton(
+      this,
+      280,
+      height - 50,
+      180,
+      40,
+      '🎮 Activate UI System',
+      () => {
+        this.activateUISystem();
+      },
+      {
+        fontSize: 14,
+        bgColor: 0x1a4a1a,
+        borderColor: 0x32CD32,
+        textColor: '#F5F5DC',
+        hoverBgColor: 0x2d6a2d,
+        hoverBorderColor: 0x00FF00,
+        hoverTextColor: '#FFFFFF'
+      }
+    );
+    
     // Enable pointer events for UI elements
     if (this.instructionsText) {
       this.instructionsText.setInteractive();
@@ -221,8 +269,86 @@ export class Game3DTestScene extends Scene {
     );
   }
   
+  private activateUISystem(): void {
+    console.log('🎮 Manually activating UI system...');
+    
+    // Check if UIScene is already running
+    const uiScene = this.scene.get('UIScene');
+    if (uiScene && uiScene.scene.isActive()) {
+      console.log('✅ UIScene is already active');
+      
+      // Try to trigger the demo manually
+      this.time.delayedCall(500, () => {
+        console.log('🎯 Attempting to access UI demo...');
+        
+        // Access the global demo object if available
+        const demo = (window as any).uiDemo;
+        if (demo) {
+          console.log('✅ UI Demo found - triggering manual activation');
+          demo.triggerActionBarDemo();
+          demo.triggerCombatUIDemo();
+          demo.triggerLootDemo();
+        } else {
+          console.log('⚠️ UI Demo not found - try refreshing the page');
+        }
+        
+        // Show manual activation guide
+        const guide = (window as any).activateFullUIDemo;
+        if (guide) {
+          guide();
+        }
+      });
+    } else {
+      console.log('🎯 UIScene not active - launching now...');
+      this.scene.launch('UIScene');
+      
+      // Wait a bit then try to activate demo
+      this.time.delayedCall(2000, () => {
+        const demo = (window as any).uiDemo;
+        if (demo) {
+          demo.triggerActionBarDemo();
+        }
+      });
+    }
+  }
+  
+  private activateUISystem(): void {
+    console.log('🎮 Manually activating UI system...');
+    
+    if (this.directUI && this.directUI.isUIActive()) {
+      console.log('✅ Direct UI system is already active');
+      
+      // Show activation guide
+      const guide = (window as any).activateFullUIDemo;
+      if (guide) {
+        guide();
+      }
+      
+      // Trigger some demo actions
+      const demo = (window as any).uiDemo;
+      if (demo) {
+        demo.triggerActionBarDemo();
+        demo.triggerCombatUIDemo();
+      }
+    } else {
+      console.log('🎯 Creating new direct UI system...');
+      this.directUI = createDirectUI(this);
+    }
+  }
+  
   private returnToMenu(): void {
     DebugConsole.info('SCENE', '🔄 Returning to Menu');
+    
+    // Clean up direct UI system
+    if (this.directUI) {
+      this.directUI.deactivate();
+      this.directUI = null;
+    }
+    
+    // Stop UIScene if it's running
+    if (this.scene.isActive('UIScene')) {
+      this.scene.stop('UIScene');
+    }
     
     // Clean up 3D scene
     if (this.game3D) {

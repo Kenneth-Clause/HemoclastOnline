@@ -234,6 +234,33 @@ export class ResponsiveLayout {
       slotSpacing: 10,
       totalSlots: 6
     },
+
+    // Player Frame - top-left corner
+    PLAYER_FRAME: {
+      anchor: 'top-left' as const,
+      offsetX: 20,
+      offsetY: 20,
+      width: 250,
+      height: 120
+    },
+
+    // Target Frame - top-center area
+    TARGET_FRAME: {
+      anchor: 'top-center' as const,
+      offsetX: 0,
+      offsetY: 20,
+      width: 250,
+      height: 120
+    },
+
+    // Party Frames - left side
+    PARTY_FRAMES: {
+      anchor: 'top-left' as const,
+      offsetX: 20,
+      offsetY: 160,
+      width: 200,
+      height: 300
+    },
     
     // Resource bars - top-left area
     RESOURCE_BARS: {

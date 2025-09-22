@@ -434,7 +434,7 @@ export class DebugConsole {
           this.clear();
           break;
         case 'help':
-          this.addLog('INFO', 'GENERAL', 'Available commands: clear, help, scene, character, camera, network, movement, performance, assets, gamestate, input');
+          this.addLog('INFO', 'GENERAL', 'Available commands: clear, help, scene, character, camera, network, movement, performance, assets, gamestate, input, ui, uihelp, uitest, uidemo');
           break;
         case 'scene':
           // Access scene info if available
@@ -497,6 +497,18 @@ export class DebugConsole {
           this.refreshDisplay();
           this.addLog('INFO', 'GENERAL', 'Input debugging enabled');
           break;
+        case 'ui':
+          this.debugUISystem();
+          break;
+        case 'uihelp':
+          this.showUIHelp();
+          break;
+        case 'uitest':
+          this.testUIComponents();
+          break;
+        case 'uidemo':
+          this.activateUIDemo();
+          break;
         default:
           // Try to evaluate as JavaScript
           try {
@@ -542,4 +554,189 @@ export class DebugConsole {
     const instance = DebugConsole.getInstance();
     instance.addLogLegacy(type, args);
   }
+
+  // UI Debug Methods
+  private debugUISystem(): void {
+    this.addLog('INFO', 'GENERAL', '🎮 UI System Debug Information:');
+    
+    // Check for UIScene
+    const uiScene = (window as any).game?.scene?.getScene('UIScene');
+    if (uiScene) {
+      this.addLog('INFO', 'GENERAL', `✅ UIScene found - Active: ${uiScene.scene.isActive()}`);
+      
+      if (uiScene.uiManager) {
+        this.addLog('INFO', 'GENERAL', '✅ UIManager found in UIScene');
+        this.debugUIManager(uiScene.uiManager);
+      } else {
+        this.addLog('WARN', 'GENERAL', '⚠️ UIManager not found in UIScene');
+      }
+    } else {
+      this.addLog('WARN', 'GENERAL', '⚠️ UIScene not found');
+    }
+    
+    // Check for Direct UI
+    const directUI = (window as any).directUI;
+    if (directUI) {
+      this.addLog('INFO', 'GENERAL', `✅ Direct UI found - Active: ${directUI.isUIActive()}`);
+      
+      const uiManager = directUI.getUIManager();
+      if (uiManager) {
+        this.addLog('INFO', 'GENERAL', '✅ UIManager found in Direct UI');
+        this.debugUIManager(uiManager);
+      }
+    } else {
+      this.addLog('WARN', 'GENERAL', '⚠️ Direct UI not found');
+    }
+    
+    // Check for UI Demo
+    const uiDemo = (window as any).uiDemo;
+    if (uiDemo) {
+      this.addLog('INFO', 'GENERAL', '✅ UI Demo found and available');
+    } else {
+      this.addLog('WARN', 'GENERAL', '⚠️ UI Demo not found');
+    }
+  }
+
+  private debugUIManager(uiManager: any): void {
+    const components = [
+      'ActionBar', 'PlayerFrame', 'TargetFrame', 'PartyFrames',
+      'Inventory', 'CharacterSheet', 'QuestTracker', 'ChatSystem',
+      'GuildPanel', 'FriendsList', 'LootWindow', 'CurrencyTracker',
+      'VendorUI', 'DungeonUI', 'CombatUI', 'AchievementPanel', 'DailyTasks'
+    ];
+    
+    components.forEach(component => {
+      const getter = `get${component}`;
+      if (typeof uiManager[getter] === 'function') {
+        const instance = uiManager[getter]();
+        const status = instance ? '✅' : '❌';
+        this.addLog('INFO', 'GENERAL', `${status} ${component}: ${instance ? 'Loaded' : 'Not loaded'}`);
+      }
+    });
+  }
+
+  private showUIHelp(): void {
+    this.addLog('INFO', 'GENERAL', '🎮 UI System Help:');
+    this.addLog('INFO', 'GENERAL', '');
+    this.addLog('INFO', 'GENERAL', '⌨️ Keyboard Shortcuts:');
+    this.addLog('INFO', 'GENERAL', '  F12 - Toggle all UI');
+    this.addLog('INFO', 'GENERAL', '  I - Inventory, C - Character Sheet, J - Quest Tracker');
+    this.addLog('INFO', 'GENERAL', '  G - Guild Panel, O - Friends List');
+    this.addLog('INFO', 'GENERAL', '  Y - Achievements, L - Daily Tasks, V - Vendor');
+    this.addLog('INFO', 'GENERAL', '  1-0, Q, E - Action Bar abilities');
+    this.addLog('INFO', 'GENERAL', '');
+    this.addLog('INFO', 'GENERAL', '🔧 Debug Commands:');
+    this.addLog('INFO', 'GENERAL', '  ui - Check UI system status');
+    this.addLog('INFO', 'GENERAL', '  uitest - Test all UI components');
+    this.addLog('INFO', 'GENERAL', '  uidemo - Activate UI demo');
+    this.addLog('INFO', 'GENERAL', '');
+    this.addLog('INFO', 'GENERAL', '🎯 Console Commands:');
+    this.addLog('INFO', 'GENERAL', '  activateFullUIDemo() - Show complete guide');
+    this.addLog('INFO', 'GENERAL', '  uiDemo.triggerActionBarDemo() - Test abilities');
+    this.addLog('INFO', 'GENERAL', '  directUI.toggleUI() - Toggle direct UI');
+  }
+
+  private testUIComponents(): void {
+    this.addLog('INFO', 'GENERAL', '🧪 Testing UI Components...');
+    
+    // Try to access UI systems
+    const directUI = (window as any).directUI;
+    const uiDemo = (window as any).uiDemo;
+    
+    if (directUI && directUI.isUIActive()) {
+      this.addLog('INFO', 'GENERAL', '✅ Direct UI is active');
+      
+      const uiManager = directUI.getUIManager();
+      if (uiManager) {
+        // Test each component
+        const tests = [
+          { name: 'ActionBar', method: 'getActionBar' },
+          { name: 'PlayerFrame', method: 'getPlayerFrame' },
+          { name: 'Inventory', method: 'getInventory' },
+          { name: 'CharacterSheet', method: 'getCharacterSheet' },
+          { name: 'QuestTracker', method: 'getQuestTracker' },
+          { name: 'ChatSystem', method: 'getChatSystem' },
+          { name: 'GuildPanel', method: 'getGuildPanel' },
+          { name: 'FriendsList', method: 'getFriendsList' }
+        ];
+        
+        tests.forEach(test => {
+          try {
+            const component = uiManager[test.method]();
+            this.addLog('INFO', 'GENERAL', `✅ ${test.name}: ${component ? 'Working' : 'Not found'}`);
+          } catch (error) {
+            this.addLog('ERROR', 'GENERAL', `❌ ${test.name}: Error - ${error}`);
+          }
+        });
+      }
+    } else {
+      this.addLog('WARN', 'GENERAL', '⚠️ Direct UI not active - try "uidemo" command');
+    }
+    
+    if (uiDemo) {
+      this.addLog('INFO', 'GENERAL', '✅ UI Demo available');
+      
+      // Trigger a quick test
+      try {
+        uiDemo.triggerActionBarDemo();
+        this.addLog('INFO', 'GENERAL', '✅ Action Bar demo triggered');
+      } catch (error) {
+        this.addLog('ERROR', 'GENERAL', `❌ Demo test failed: ${error}`);
+      }
+    } else {
+      this.addLog('WARN', 'GENERAL', '⚠️ UI Demo not available');
+    }
+  }
+
+  private activateUIDemo(): void {
+    this.addLog('INFO', 'GENERAL', '🎮 Activating UI Demo...');
+    
+    // Try direct UI first
+    const directUI = (window as any).directUI;
+    if (directUI) {
+      if (!directUI.isUIActive()) {
+        directUI.activate();
+        this.addLog('INFO', 'GENERAL', '✅ Direct UI activated');
+      } else {
+        this.addLog('INFO', 'GENERAL', '✅ Direct UI already active');
+      }
+    } else {
+      // Try to create direct UI
+      try {
+        const currentScene = (window as any).game?.scene?.scenes?.find((s: any) => s.scene.isActive());
+        if (currentScene) {
+          this.addLog('INFO', 'GENERAL', `🎯 Creating Direct UI in scene: ${currentScene.constructor.name}`);
+          const { createDirectUI } = require('./DirectUIActivation');
+          createDirectUI(currentScene);
+          this.addLog('INFO', 'GENERAL', '✅ Direct UI created successfully');
+        } else {
+          this.addLog('ERROR', 'GENERAL', '❌ No active scene found');
+        }
+      } catch (error) {
+        this.addLog('ERROR', 'GENERAL', `❌ Failed to create Direct UI: ${error}`);
+      }
+    }
+    
+    // Activate demo functions
+    this.time.delayedCall(1000, () => {
+      const guide = (window as any).activateFullUIDemo;
+      if (guide) {
+        guide();
+        this.addLog('INFO', 'GENERAL', '✅ UI guide activated');
+      }
+      
+      const demo = (window as any).uiDemo;
+      if (demo) {
+        demo.triggerActionBarDemo();
+        this.addLog('INFO', 'GENERAL', '✅ UI demo triggered');
+      }
+    });
+  }
+
+  // Add timer reference for delayed calls
+  private time = {
+    delayedCall: (delay: number, callback: () => void) => {
+      setTimeout(callback, delay);
+    }
+  };
 }
