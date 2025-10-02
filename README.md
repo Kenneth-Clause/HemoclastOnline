@@ -1,13 +1,13 @@
 # 🩸 HemoclastOnline
 
-**Gothic Fantasy MMO-lite** - A browser-based 2D sprite MMO with dark, atmospheric gameplay inspired by Blood Omen: Legacy of Kain.
+**Gothic Fantasy MMO-lite** - A browser-based 3D MMO with dark, atmospheric gameplay inspired by Blood Omen: Legacy of Kain/Neverwinter Nights.
 
 ## 🎮 Game Overview
 
 HemoclastOnline is a casual MMO-lite RPG where players create characters, battle monsters in turn-based combat, unlock skills, collect loot, and join guilds to take down raid bosses together — all in short, social, sticky sessions.
 
 ### Key Features
-- **2D Isometric Gothic Fantasy** - Dark medieval aesthetic with atmospheric lighting
+- **3D Gothic Fantasy** - Dark medieval aesthetic with atmospheric lighting
 - **Turn-based Combat** - Strategic skill-based battles with status effects
 - **Guild System** - Cooperative raid bosses and social features
 - **Progression System** - Levels 1-30, skill unlocks, equipment upgrades
