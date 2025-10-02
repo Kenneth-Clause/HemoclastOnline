@@ -2,9 +2,8 @@
 
 ## Executive Summary
 
-This document outlines the complete technical roadmap for transforming HemoclastOnline from a 2D Phaser-based game into a full 3D MMO with Neverwinter Nights-style gameplay and graphics, capable of supporting thousands of concurrent players.
+This document outlines the complete technical roadmap for a full 3D MMO with Neverwinter Nights-style gameplay and graphics, capable of supporting thousands of concurrent players.
 
-**Current State**: Solid 2D foundation with multiplayer infrastructure
 **Target State**: 3D MMO with NWN-quality graphics and 10,000+ concurrent players
 **Timeline**: 18-24 months
 **Budget Estimate**: $800K - $2.5M
